@@ -1,0 +1,5 @@
+{
+  "name": "Gerador e Editor de Imagens IA",
+  "description": "Uma poderosa suite de geração e edição de imagens alimentada pelo modelo Gemini 2.5 Flash Image da Google. Gere visuais incríveis a partir de texto ou edite imagens existentes com instruções em linguagem natural.",
+  "requestFramePermissions": []
+}
