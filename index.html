@@ -128,6 +128,24 @@
         });
       }
     </script>
+
+    <!-- AUTO-RECOVERY SCRIPT -->
+    <script>
+      // Check if React mounted successfully after 3 seconds
+      setTimeout(() => {
+        const root = document.getElementById('root');
+        // If root is empty, it means the app crashed or failed to load resources (Broken File Icon)
+        if (!root || root.innerHTML.trim() === '') {
+          console.error("System: App failed to mount (White Screen detected). Forcing Recovery Reload.");
+          
+          // Add a flag to prevent infinite loops, though timestamp usually fixes it
+          if (!window.location.search.includes('recovery=true')) {
+             const newUrl = window.location.pathname + '?recovery=true&t=' + Date.now();
+             window.location.href = newUrl;
+          }
+        }
+      }, 3000);
+    </script>
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>
