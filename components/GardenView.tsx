@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Button } from './Button';
 import { generateGardenPlan, generateCropDetails } from '../services/geminiService';
 import { GardenPlan, CropReport, WatermarkSettings, Watermark } from '../types';
-import { Sprout, Search, Sun, Mountain, Bug, HeartHandshake, Scissors, Printer, CheckCircle2, Stamp, LayoutDashboard, Carrot, Shovel, Droplets, Calendar, HelpCircle, BookOpen, Wrench } from 'lucide-react';
+import { Sprout, Search, Sun, Mountain, Bug, HeartHandshake, Scissors, Printer, CheckCircle2, Stamp, LayoutDashboard, Carrot, Shovel, Droplets, Calendar, HelpCircle, BookOpen, Wrench, Globe2 } from 'lucide-react';
 
 interface GardenViewProps {
   watermarkSettings?: WatermarkSettings;
@@ -20,6 +20,9 @@ export const GardenView: React.FC<GardenViewProps> = ({
 }) => {
   const [mode, setMode] = useState<DashboardMode>('new');
   
+  // Local Toggle
+  const [localWatermarkEnabled, setLocalWatermarkEnabled] = useState(true);
+
   // --- DASHBOARD STATE (New/Maintenance) ---
   const [month, setMonth] = useState('Novembro');
   const [region, setRegion] = useState('Centro');
@@ -67,33 +70,180 @@ export const GardenView: React.FC<GardenViewProps> = ({
       }
   };
 
-  // Improved Printing Logic
-  const handlePrint = (elementId: string) => {
-      const printContent = document.getElementById(elementId);
-      if (!printContent) return;
-
-      const printWindow = window.open('', '', 'height=800,width=900');
-      if (!printWindow) return;
-
-      printWindow.document.write('<html><head><title>Relatório Nexus AI</title>');
-      printWindow.document.write('<script src="https://cdn.tailwindcss.com"></script>');
-      printWindow.document.write('<style>body { font-family: sans-serif; -webkit-print-color-adjust: exact; background: white !important; } .no-print { display: none; } </style>');
-      printWindow.document.write('</head><body class="bg-white p-8 relative">');
-      
-      // Watermark Injection
-      if (watermarkSettings?.isEnabled && activeWatermark) {
-          printWindow.document.write(`
-            <div style="position: fixed; top: 20px; right: 20px; opacity: ${watermarkSettings.opacity / 100}; z-index: 9999; pointer-events: none;">
-                <img src="${activeWatermark.previewUrl}" style="width: 100px; max-width: 150px;" />
-            </div>
-          `);
+  // --- MANUAL HTML GENERATION FOR ROBUST PRINTING ---
+  const handlePrint = () => {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+          alert("Permita popups para imprimir.");
+          return;
       }
 
-      printWindow.document.write(printContent.innerHTML);
-      printWindow.document.write('</body></html>');
-      printWindow.document.close();
+      const shouldShowWatermark = watermarkSettings?.isEnabled && localWatermarkEnabled && activeWatermark;
+      const wmOpacity = watermarkSettings?.opacity ? watermarkSettings.opacity / 100 : 0.5;
+      const wmUrl = activeWatermark?.previewUrl || '';
 
+      // Generate Content HTML based on active mode
+      let contentHtml = '';
+
+      if (mode === 'search' && cropReport) {
+          // ENCYCLOPEDIA LAYOUT
+          const imgUrl = `https://image.pollinations.ai/prompt/photorealistic ${cropReport.imageKeywords || cropReport.scientificName} close up high quality nature agriculture photography?width=800&height=400&nologo=true`;
+          
+          contentHtml = `
+            <div class="header-img-container">
+                <img src="${imgUrl}" class="header-img" />
+                <div class="header-overlay">
+                    <h1>${cropReport.name}</h1>
+                    <p><em>${cropReport.scientificName}</em> • ${cropReport.family}</p>
+                </div>
+            </div>
+
+            <!-- ORIGIN SECTION (NEW) -->
+            ${cropReport.origin ? `
+            <div class="origin-box">
+                <strong>🌍 Origem & História:</strong> ${cropReport.origin}
+            </div>` : ''}
+
+            <div class="grid-3">
+                <div class="card"><strong>☀️ Exposição Solar</strong><br>${cropReport.sun}</div>
+                <div class="card"><strong>💧 Rega</strong><br>${cropReport.water}</div>
+                <div class="card"><strong>⛰️ Solo & pH</strong><br>${cropReport.soil.type} (${cropReport.soil.ph})</div>
+            </div>
+
+            <div class="section">
+                <h3>📅 Calendário</h3>
+                <p><strong>Quando Plantar:</strong> ${cropReport.plantingSeason}</p>
+                <p><strong>Colheita:</strong> ${cropReport.harvestTime}</p>
+            </div>
+
+            <div class="section">
+                <h3>🐞 Pragas e Doenças</h3>
+                <p><strong>Pragas:</strong> ${cropReport.pests.join(', ')}</p>
+                <p><strong>Doenças:</strong> ${cropReport.diseases.join(', ')}</p>
+            </div>
+
+            <div class="section">
+                <h3>✅ Tratamentos e Cuidados</h3>
+                <p>${cropReport.treatments}</p>
+            </div>
+
+            ${cropReport.pruning ? `
+            <div class="section">
+                <h3>✂️ Poda</h3>
+                <p>${cropReport.pruning}</p>
+            </div>` : ''}
+
+            <div class="section">
+                <h3>🤝 Associações</h3>
+                <p>${cropReport.associations}</p>
+            </div>
+          `;
+      } else if (gardenPlan) {
+          // DASHBOARD LAYOUT
+          contentHtml = `
+            <div class="plan-header">
+                <h1>${gardenPlan.title}</h1>
+                <p>${month} • ${region} • ${method}</p>
+            </div>
+
+            <div class="summary-box">
+                "${gardenPlan.summary}"
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3>🛠️ Método (${method})</h3>
+                    <p>${gardenPlan.methodAdvice}</p>
+                </div>
+                <div class="card">
+                    <h3>🌱 Solo</h3>
+                    <p>${gardenPlan.soilTips}</p>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>📋 Tarefas Essenciais</h3>
+                <ul>
+                    ${gardenPlan.tasks.map(t => `<li>${t}</li>`).join('')}
+                </ul>
+            </div>
+
+            ${gardenPlan.expertAnswer ? `
+            <div class="expert-box">
+                <h3>💡 Resposta do Especialista</h3>
+                <p>${gardenPlan.expertAnswer}</p>
+            </div>` : ''}
+          `;
+      } else {
+          return; // Nothing to print
+      }
+
+      // WRITE FULL HTML DOCUMENT
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Relatório Nexus AI</title>
+            <style>
+                @page { size: A4; margin: 1.5cm; }
+                body { font-family: 'Helvetica', sans-serif; color: #1f2937; line-height: 1.5; margin: 0; padding: 0; }
+                
+                /* Layouts */
+                .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+                .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+                
+                /* Styling */
+                .header-img-container { position: relative; height: 250px; overflow: hidden; border-radius: 8px; margin-bottom: 20px; background: #333; }
+                .header-img { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; }
+                .header-overlay { position: absolute; bottom: 0; left: 0; right: 0; padding: 20px; background: linear-gradient(transparent, rgba(0,0,0,0.8)); color: white; }
+                .header-overlay h1 { margin: 0; font-size: 32px; }
+                
+                .origin-box { background: #fdf4ff; border: 1px solid #f0abfc; padding: 15px; border-radius: 8px; color: #701a75; margin-bottom: 20px; font-size: 13px; }
+
+                .plan-header { border-bottom: 2px solid #166534; margin-bottom: 20px; padding-bottom: 10px; }
+                .plan-header h1 { color: #166534; margin: 0; font-size: 28px; }
+                
+                .card { border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; background: #f9fafb; page-break-inside: avoid; }
+                
+                .section { margin-bottom: 20px; page-break-inside: avoid; }
+                h3 { color: #15803d; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 0; }
+                
+                .summary-box { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; font-style: italic; color: #166534; margin-bottom: 20px; }
+                .expert-box { background: #eef2ff; border: 1px solid #c7d2fe; padding: 15px; border-radius: 8px; color: #3730a3; page-break-inside: avoid; }
+                
+                ul { padding-left: 20px; }
+                li { margin-bottom: 5px; }
+
+                /* WATERMARK FIXED BOTTOM RIGHT */
+                #watermark {
+                    position: fixed;
+                    bottom: 0;
+                    right: 0;
+                    z-index: 9999;
+                    opacity: ${wmOpacity};
+                    text-align: right;
+                }
+                #watermark img { width: 120px; height: auto; }
+            </style>
+        </head>
+        <body>
+            ${contentHtml}
+            
+            ${shouldShowWatermark ? `
+            <div id="watermark">
+                <img src="${wmUrl}" />
+                <div style="font-size: 10px; color: #666;">Nexus AI Garden</div>
+            </div>
+            ` : ''}
+        </body>
+        </html>
+      `);
+      
+      printWindow.document.close();
+      
+      // Wait for image load then print
       printWindow.setTimeout(() => {
+          printWindow.focus();
           printWindow.print();
       }, 1000);
   };
@@ -268,14 +418,15 @@ export const GardenView: React.FC<GardenViewProps> = ({
                   {watermarkSettings && onToggleWatermark && (
                       <div className="mt-auto pt-4 border-t border-slate-700/50 flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                              <Stamp className={`w-3 h-3 ${watermarkSettings.isEnabled ? 'text-green-400' : 'text-slate-500'}`} />
+                              <Stamp className={`w-3 h-3 ${localWatermarkEnabled && watermarkSettings.isEnabled ? 'text-green-400' : 'text-slate-500'}`} />
                               <span className="text-xs text-slate-400">Marca d'Água (PDF)</span>
                           </div>
                           <button 
-                              onClick={() => onToggleWatermark(!watermarkSettings.isEnabled)}
-                              className={`w-8 h-4 rounded-full relative transition-colors ${watermarkSettings.isEnabled ? 'bg-green-600' : 'bg-slate-600'}`}
+                              onClick={() => setLocalWatermarkEnabled(!localWatermarkEnabled)}
+                              className={`w-8 h-4 rounded-full relative transition-colors ${localWatermarkEnabled ? 'bg-green-600' : 'bg-slate-600'} ${!watermarkSettings.isEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              disabled={!watermarkSettings.isEnabled}
                           >
-                              <div className={`absolute top-0.5 left-0.5 bg-white w-3 h-3 rounded-full transition-transform ${watermarkSettings.isEnabled ? 'translate-x-4' : ''}`} />
+                              <div className={`absolute top-0.5 left-0.5 bg-white w-3 h-3 rounded-full transition-transform ${localWatermarkEnabled ? 'translate-x-4' : ''}`} />
                           </button>
                       </div>
                   )}
@@ -297,7 +448,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
                                 </p>
                             </div>
                             <button 
-                              onClick={() => handlePrint('dashboard-report')}
+                              onClick={handlePrint}
                               className="no-print flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 text-xs font-medium transition-colors"
                             >
                                 <Printer className="w-4 h-4" /> PDF
@@ -373,7 +524,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
                     <div id="encyclopedia-report" className="h-full bg-white text-slate-900 overflow-y-auto animate-in fade-in duration-500 rounded-lg">
                         <div className="relative h-64 overflow-hidden bg-slate-900 group">
                             <img 
-                                src={`https://image.pollinations.ai/prompt/photorealistic ${cropReport.imageKeywords || cropReport.scientificName} close up high quality nature agriculture photography?width=1200&height=600&nologo=true`}
+                                src={`https://image.pollinations.ai/prompt/photorealistic ${cropReport.imageKeywords || cropReport.scientificName} close up high quality nature agriculture photography?width=800&height=400&nologo=true`}
                                 alt={cropReport.name}
                                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
                                 onError={(e) => e.currentTarget.style.display = 'none'} 
@@ -391,7 +542,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
                                         </p>
                                     </div>
                                     <button 
-                                        onClick={() => handlePrint('encyclopedia-report')}
+                                        onClick={handlePrint}
                                         className="no-print flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-md px-4 py-2 rounded-lg transition-colors text-white text-xs font-medium border border-white/20 shadow-lg"
                                     >
                                         <Printer className="w-4 h-4" /> Imprimir / PDF
@@ -401,6 +552,18 @@ export const GardenView: React.FC<GardenViewProps> = ({
                         </div>
 
                         <div className="p-8 bg-slate-50">
+                            
+                            {/* ORIGIN SECTION (UI DISPLAY) */}
+                            {cropReport.origin && (
+                                <div className="bg-fuchsia-50 border border-fuchsia-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+                                    <Globe2 className="w-5 h-5 text-fuchsia-600 mt-0.5 flex-shrink-0" />
+                                    <div>
+                                        <h4 className="text-sm font-bold text-fuchsia-800 uppercase mb-1">Origem & História</h4>
+                                        <p className="text-sm text-fuchsia-900 leading-relaxed">{cropReport.origin}</p>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                                 <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex items-start gap-3">
                                     <div className="p-2 bg-orange-100 text-orange-600 rounded-lg"><Sun className="w-5 h-5" /></div>

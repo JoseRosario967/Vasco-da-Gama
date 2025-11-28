@@ -38,6 +38,9 @@ export const TextEditorView: React.FC<TextEditorViewProps> = ({
   const [color, setColor] = useState('#ffffff');
   const [textAlign, setTextAlign] = useState<TextAlign>('center');
   
+  // Local Watermark Toggle
+  const [localWatermarkEnabled, setLocalWatermarkEnabled] = useState(true);
+
   // Free positioning state
   const [textPos, setTextPos] = useState<Point>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -66,7 +69,7 @@ export const TextEditorView: React.FC<TextEditorViewProps> = ({
   // Initialize canvas when image changes or window resizes
   useEffect(() => {
     drawCanvas();
-  }, [image, text, fontSize, fontFamily, color, textAlign, textPos, showBackground, backgroundColor, watermarkImage, watermarkSettings]);
+  }, [image, text, fontSize, fontFamily, color, textAlign, textPos, showBackground, backgroundColor, watermarkImage, watermarkSettings, localWatermarkEnabled]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -103,8 +106,10 @@ export const TextEditorView: React.FC<TextEditorViewProps> = ({
     // 1. Draw Base Image
     ctx.drawImage(image, 0, 0);
 
-    // 2. Draw Watermark (if enabled)
-    if (watermarkSettings.isEnabled && watermarkImage) {
+    // 2. Draw Watermark (if Global enabled AND Local enabled)
+    const shouldDrawWatermark = watermarkSettings.isEnabled && localWatermarkEnabled && watermarkImage;
+
+    if (shouldDrawWatermark) {
         // Calculate Watermark Size
         const scale = watermarkSettings.scale || 0.25; 
         const targetWidth = image.width * scale; 
@@ -378,18 +383,19 @@ export const TextEditorView: React.FC<TextEditorViewProps> = ({
           {/* Watermark Toggle */}
           <div className="flex items-center justify-between bg-slate-900/50 p-3 rounded-lg border border-slate-800">
                 <div className="flex items-center gap-2">
-                    <Stamp className={`w-4 h-4 ${watermarkSettings.isEnabled ? 'text-indigo-400' : 'text-slate-500'}`} />
+                    <Stamp className={`w-4 h-4 ${localWatermarkEnabled && watermarkSettings.isEnabled ? 'text-indigo-400' : 'text-slate-500'}`} />
                     <span className="text-sm text-slate-300">Marca d'Água</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    {watermarkSettings.isEnabled && !activeWatermark && (
+                    {localWatermarkEnabled && watermarkSettings.isEnabled && !activeWatermark && (
                         <span className="text-[10px] text-red-400 mr-2">Nenhuma selecionada</span>
                     )}
                     <button 
-                        onClick={() => onToggleWatermark(!watermarkSettings.isEnabled)}
-                        className={`w-10 h-5 rounded-full relative transition-colors ${watermarkSettings.isEnabled ? 'bg-indigo-600' : 'bg-slate-600'}`}
+                        onClick={() => setLocalWatermarkEnabled(!localWatermarkEnabled)}
+                        className={`w-10 h-5 rounded-full relative transition-colors ${localWatermarkEnabled ? 'bg-indigo-600' : 'bg-slate-600'} ${!watermarkSettings.isEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        disabled={!watermarkSettings.isEnabled}
                     >
-                        <div className={`absolute top-1 left-1 bg-white w-3 h-3 rounded-full transition-transform ${watermarkSettings.isEnabled ? 'translate-x-5' : ''}`} />
+                        <div className={`absolute top-1 left-1 bg-white w-3 h-3 rounded-full transition-transform ${localWatermarkEnabled ? 'translate-x-5' : ''}`} />
                     </button>
                 </div>
             </div>
@@ -471,7 +477,7 @@ export const TextEditorView: React.FC<TextEditorViewProps> = ({
               <input 
                 type="checkbox" 
                 checked={showBackground}
-                onChange={(e) => setShowBackground(e.target.checked)}
+                onChange={(e) => setShowBackground(e.target.value)}
                 className="w-5 h-5 rounded border-slate-600 text-indigo-600 focus:ring-indigo-500 bg-slate-800"
               />
             </div>

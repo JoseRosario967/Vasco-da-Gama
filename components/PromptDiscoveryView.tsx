@@ -1,25 +1,24 @@
+
 import React, { useState, useRef } from 'react';
 import { UploadedFile } from '../types';
-import { analyzeImageDifference } from '../services/geminiService';
+import { discoverImagePrompt } from '../services/geminiService';
 import { Button } from './Button';
-import { ScanSearch, UploadCloud, X, Copy, Check, ArrowRight } from 'lucide-react';
+import { ScanSearch, UploadCloud, X, Copy, Check, ArrowRight, Sparkles } from 'lucide-react';
 
 interface PromptDiscoveryViewProps {
   onApplyPrompt: (file: UploadedFile, prompt: string) => void;
 }
 
 export const PromptDiscoveryView: React.FC<PromptDiscoveryViewProps> = ({ onApplyPrompt }) => {
-  const [originalImage, setOriginalImage] = useState<UploadedFile | null>(null);
-  const [editedImage, setEditedImage] = useState<UploadedFile | null>(null);
+  const [image, setImage] = useState<UploadedFile | null>(null);
   const [detectedPrompt, setDetectedPrompt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const originalInputRef = useRef<HTMLInputElement>(null);
-  const editedInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, isOriginal: boolean) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const reader = new FileReader();
@@ -35,11 +34,8 @@ export const PromptDiscoveryView: React.FC<PromptDiscoveryViewProps> = ({ onAppl
           mimeType: file.type
         };
 
-        if (isOriginal) setOriginalImage(fileData);
-        else setEditedImage(fileData);
-        
-        // Reset results if image changes
-        setDetectedPrompt(null);
+        setImage(fileData);
+        setDetectedPrompt(null); // Reset result
       };
       
       reader.readAsDataURL(file);
@@ -47,22 +43,20 @@ export const PromptDiscoveryView: React.FC<PromptDiscoveryViewProps> = ({ onAppl
   };
 
   const handleDiscover = async () => {
-    if (!originalImage || !editedImage) return;
+    if (!image) return;
 
     setIsLoading(true);
     setError(null);
     setDetectedPrompt(null);
 
     try {
-      const prompt = await analyzeImageDifference(
-        originalImage.base64Data,
-        originalImage.mimeType,
-        editedImage.base64Data,
-        editedImage.mimeType
+      const prompt = await discoverImagePrompt(
+        image.base64Data,
+        image.mimeType
       );
       setDetectedPrompt(prompt);
     } catch (err: any) {
-      setError(err.message || 'Ocorreu um erro ao analisar as imagens.');
+      setError(err.message || 'Ocorreu um erro ao analisar a imagem.');
     } finally {
       setIsLoading(false);
     }
@@ -76,95 +70,62 @@ export const PromptDiscoveryView: React.FC<PromptDiscoveryViewProps> = ({ onAppl
     }
   };
 
-  const ImageUploader = ({ 
-    label, 
-    image, 
-    onClear, 
-    inputRef, 
-    onChange 
-  }: { 
-    label: string, 
-    image: UploadedFile | null, 
-    onClear: () => void, 
-    inputRef: React.RefObject<HTMLInputElement | null>,
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-  }) => (
-    <div className="w-full">
-      <label className="block text-sm font-medium text-slate-300 mb-2">
-        {label}
-      </label>
-      
-      {!image ? (
-        <div 
-          onClick={() => inputRef.current?.click()}
-          className="h-48 border-2 border-dashed border-slate-600 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 hover:bg-slate-800/50 transition-all group"
-        >
-          <div className="p-3 bg-slate-800 rounded-full mb-3 group-hover:scale-110 transition-transform">
-            <UploadCloud className="w-6 h-6 text-indigo-400" />
-          </div>
-          <p className="text-sm text-slate-300 font-medium text-center">Carregar Imagem</p>
-        </div>
-      ) : (
-        <div className="relative rounded-lg overflow-hidden border border-slate-600 bg-slate-900 group h-48">
-          <img 
-            src={image.previewUrl} 
-            alt={label} 
-            className="w-full h-full object-contain bg-black/20"
-          />
-          <button 
-            onClick={onClear}
-            className="absolute top-2 right-2 p-1 bg-red-500/80 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-      <input 
-        type="file" 
-        ref={inputRef}
-        onChange={onChange}
-        accept="image/*"
-        className="hidden"
-      />
-    </div>
-  );
-
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 mb-8">
-        <h2 className="text-xl font-semibold text-white mb-2 flex items-center gap-2">
-          <ScanSearch className="w-6 h-6 text-indigo-400" />
-          Descobridor de Incentivos
+    <div className="max-w-3xl mx-auto">
+      <div className="bg-slate-800/50 p-8 rounded-xl border border-slate-700 mb-8">
+        <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">
+          <ScanSearch className="w-8 h-8 text-cyan-400" />
+          Descobridor de Prompt
         </h2>
-        <p className="text-slate-400 text-sm mb-6">
-          Carregue a imagem original e a versão editada. A IA irá analisar as diferenças e tentar descobrir qual foi o prompt utilizado.
+        <p className="text-slate-400 text-sm mb-8">
+          Carregue qualquer imagem e a IA fará a engenharia reversa para descobrir o prompt exato necessário para a criar.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <ImageUploader 
-            label="1. Imagem Original" 
-            image={originalImage} 
-            onClear={() => setOriginalImage(null)}
-            inputRef={originalInputRef}
-            onChange={(e) => handleFileSelect(e, true)}
-          />
-          <ImageUploader 
-            label="2. Imagem Editada" 
-            image={editedImage} 
-            onClear={() => setEditedImage(null)}
-            inputRef={editedInputRef}
-            onChange={(e) => handleFileSelect(e, false)}
-          />
+        {/* Upload Area */}
+        <div className="mb-8">
+            {!image ? (
+                <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-64 border-2 border-dashed border-slate-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan-500 hover:bg-slate-800/50 transition-all group"
+                >
+                    <div className="p-4 bg-slate-800 rounded-full mb-4 group-hover:scale-110 transition-transform">
+                        <UploadCloud className="w-10 h-10 text-cyan-400" />
+                    </div>
+                    <p className="text-lg text-slate-200 font-medium">Carregar Imagem para Análise</p>
+                    <p className="text-sm text-slate-500 mt-2">Suporta JPG e PNG</p>
+                </div>
+            ) : (
+                <div className="relative h-64 rounded-xl overflow-hidden border border-slate-600 bg-slate-900 group flex justify-center">
+                    <img 
+                        src={image.previewUrl} 
+                        alt="To Analyze" 
+                        className="h-full object-contain"
+                    />
+                    <button 
+                        onClick={() => { setImage(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                        className="absolute top-4 right-4 p-2 bg-black/60 hover:bg-red-500 text-white rounded-full transition-colors backdrop-blur-sm"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+            )}
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileSelect} 
+                accept="image/*" 
+                className="hidden" 
+            />
         </div>
 
         <Button 
           onClick={handleDiscover} 
           isLoading={isLoading} 
-          disabled={!originalImage || !editedImage}
-          className="w-full"
-          icon={<ScanSearch className="w-4 h-4" />}
+          disabled={!image}
+          className="w-full py-4 text-lg bg-cyan-600 hover:bg-cyan-500"
+          icon={<Sparkles className="w-5 h-5" />}
         >
-          Descobrir o Prompt
+          Revelar a Magia (Descobrir Prompt)
         </Button>
       </div>
 
@@ -175,11 +136,18 @@ export const PromptDiscoveryView: React.FC<PromptDiscoveryViewProps> = ({ onAppl
       )}
 
       {detectedPrompt && (
-        <div className="bg-gradient-to-r from-indigo-900/40 to-violet-900/40 border border-indigo-500/30 rounded-xl p-6 animate-pulse-once">
-          <h3 className="text-sm font-medium text-indigo-300 mb-3 uppercase tracking-wider">
-            Prompt Detetado
-          </h3>
-          <div className="bg-slate-900/80 p-4 rounded-lg border border-slate-700 text-slate-100 text-lg leading-relaxed mb-6">
+        <div className="bg-gradient-to-br from-slate-900 to-cyan-900/20 border border-cyan-500/30 rounded-xl p-8 animate-in slide-in-from-bottom-4 shadow-2xl">
+          <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-2">
+                <ScanSearch className="w-4 h-4" />
+                Prompt Detetado
+              </h3>
+              <span className="text-xs text-slate-500 bg-slate-900 px-2 py-1 rounded border border-slate-800">
+                  Otimizado para Geradores de Imagem
+              </span>
+          </div>
+          
+          <div className="bg-black/40 p-6 rounded-lg border border-slate-700/50 text-slate-100 text-lg leading-loose font-mono mb-8 shadow-inner">
             "{detectedPrompt}"
           </div>
           
@@ -187,16 +155,18 @@ export const PromptDiscoveryView: React.FC<PromptDiscoveryViewProps> = ({ onAppl
             <Button 
               variant="secondary" 
               onClick={handleCopy}
-              icon={copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              className="flex-1 sm:flex-none"
+              icon={copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
             >
               {copied ? 'Copiado!' : 'Copiar Texto'}
             </Button>
             
             <Button 
-              onClick={() => originalImage && onApplyPrompt(originalImage, detectedPrompt)}
+              onClick={() => image && onApplyPrompt(image, detectedPrompt)}
+              className="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-500"
               icon={<ArrowRight className="w-4 h-4" />}
             >
-              Usar este Prompt e Imagem Original
+              Editar com este Prompt
             </Button>
           </div>
         </div>

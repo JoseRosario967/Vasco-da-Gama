@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Download, AlertCircle, ImageIcon, PenLine, Bookmark, Check } from 'lucide-react';
+import { Download, AlertCircle, ImageIcon, PenLine, Bookmark, Check, Sparkles, Zap, Cpu } from 'lucide-react';
 import { GeneratedImageResult } from '../types';
 import { saveImageToGallery } from '../services/galleryService';
 import { Button } from './Button';
@@ -10,7 +10,7 @@ interface ResultViewerProps {
   isLoading: boolean;
   error: string | null;
   onEdit?: (imageUrl: string) => void;
-  prompt?: string; // Passed to allow saving to gallery
+  prompt?: string;
 }
 
 export const ResultViewer: React.FC<ResultViewerProps> = ({ result, isLoading, error, onEdit, prompt }) => {
@@ -20,45 +20,31 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, isLoading, e
   const handleDownload = () => {
     if (result?.imageUrl) {
       try {
-        // 1. Parse Data URI
         const parts = result.imageUrl.split(';');
         const mime = parts[0].split(':')[1];
         const base64 = parts[1].split(',')[1];
-
-        // 2. Manual Conversion (Base64 -> Binary)
-        // This avoids fetch() issues with large data URIs in sandboxed environments
         const binaryStr = atob(base64);
         const len = binaryStr.length;
         const bytes = new Uint8Array(len);
         for (let i = 0; i < len; i++) {
             bytes[i] = binaryStr.charCodeAt(i);
         }
-
-        // 3. Create Blob
         const blob = new Blob([bytes], { type: mime });
         const url = window.URL.createObjectURL(blob);
-        
-        // 4. Trigger Download
         const link = document.createElement('a');
         link.href = url;
         link.download = `nexus-ai-${Date.now()}.png`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
-        // 5. Cleanup with delay to ensure download starts
         setTimeout(() => {
             window.URL.revokeObjectURL(url);
         }, 1000);
-
       } catch (e) {
-        console.error("Download failed", e);
-        // Fallback: Open in new tab
-        if (window.confirm("O download automático foi bloqueado pelo navegador. Deseja abrir a imagem numa nova aba para a guardar manualmente?")) {
+        if (window.confirm("O download automático foi bloqueado pelo navegador. Deseja abrir a imagem numa nova aba?")) {
             const newWindow = window.open();
             if (newWindow) {
                 newWindow.document.write(`<img src="${result.imageUrl}" style="max-width: 100%; height: auto;" />`);
-                newWindow.document.title = "Imagem Gerada - Nexus AI";
             }
         }
       }
@@ -71,12 +57,38 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, isLoading, e
           try {
               await saveImageToGallery(result.imageUrl, prompt || "Sem descrição");
               setIsSaved(true);
-              setTimeout(() => setIsSaved(false), 3000); // Reset after 3s
+              setTimeout(() => setIsSaved(false), 3000);
           } catch (e) {
               console.error("Failed to save", e);
           } finally {
               setIsSaving(false);
           }
+      }
+  };
+
+  // Helper to determine badge color based on model
+  const getModelBadge = (model: string) => {
+      if (model.includes('Imagen 4')) {
+          return (
+              <div className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/70 backdrop-blur-md rounded-lg border border-amber-500/50 shadow-lg shadow-amber-500/20 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+                  <Sparkles className="w-3 h-3 text-amber-400" />
+                  <span className="text-[10px] font-bold text-amber-100 uppercase tracking-wider">{model}</span>
+              </div>
+          );
+      } else if (model.includes('Imagen 3')) {
+          return (
+              <div className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/70 backdrop-blur-md rounded-lg border border-slate-400/50 shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+                  <Zap className="w-3 h-3 text-slate-300" />
+                  <span className="text-[10px] font-bold text-slate-200 uppercase tracking-wider">{model}</span>
+              </div>
+          );
+      } else {
+          return (
+              <div className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/70 backdrop-blur-md rounded-lg border border-indigo-500/30 shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+                  <Cpu className="w-3 h-3 text-indigo-400" />
+                  <span className="text-[10px] font-bold text-indigo-200 uppercase tracking-wider">{model}</span>
+              </div>
+          );
       }
   };
 
@@ -89,7 +101,6 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, isLoading, e
               <ImageIcon className="w-8 h-8 text-indigo-400" />
             </div>
             <p className="text-slate-400 font-medium">A idealizar a sua imagem...</p>
-            <p className="text-xs text-slate-500">Isto pode demorar alguns segundos</p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center gap-4 text-center p-6">
@@ -106,12 +117,11 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, isLoading, e
               alt="Generated content" 
               className="max-w-full max-h-full rounded-lg shadow-2xl object-contain"
             />
+            {/* Model Badge */}
+            {result.modelUsed && getModelBadge(result.modelUsed)}
           </div>
         ) : result?.textOutput ? (
             <div className="p-8 max-w-lg text-center">
-                <p className="text-slate-300 leading-relaxed mb-4">
-                    O modelo devolveu texto em vez de uma imagem. Isto acontece geralmente se o pedido for conversacional ou se os filtros de segurança forem ativados.
-                </p>
                 <div className="bg-slate-800 p-4 rounded-lg text-left text-sm font-mono text-indigo-300 border border-slate-700">
                     {result.textOutput}
                 </div>

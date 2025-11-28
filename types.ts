@@ -6,6 +6,7 @@ export type ImageQuality = 'standard' | 'high';
 export interface GeneratedImageResult {
   imageUrl: string | null;
   textOutput: string | null;
+  modelUsed?: string; // New field to track which model generated the image
 }
 
 export interface AppError {
@@ -126,6 +127,7 @@ export interface CropReport {
   scientificName: string;
   imageKeywords: string; 
   family: string;
+  origin: string; // NEW FIELD: Origin/History
   plantingSeason: string; 
   harvestTime: string; 
   soil: {

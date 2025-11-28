@@ -1,5 +1,5 @@
 
-import { getAllImages, clearAllImages, restoreGallery, getAllWatermarks, clearAllWatermarks, restoreWatermarks } from "./galleryService";
+import { getAllImages, clearAllImages, restoreGallery, getAllWatermarks, clearAllWatermarks, restoreWatermarks, getAllTemplates, clearAllTemplates, restoreTemplates } from "./galleryService";
 import { Watermark, WatermarkSettings, SavedImage, PromptTemplate } from "../types";
 
 interface BackupData {
@@ -8,27 +8,24 @@ interface BackupData {
   watermarks: Watermark[];
   watermarkSettings: WatermarkSettings | null;
   gallery: SavedImage[];
-  templates?: PromptTemplate[]; // Added Templates field
+  templates?: PromptTemplate[]; 
 }
 
-const BACKUP_VERSION = 2; // Bumped version
+const BACKUP_VERSION = 3; 
 
 /**
  * Collects all app data from IndexedDB and LocalStorage
  */
 export const exportData = async (): Promise<void> => {
   try {
-    // 1. Collect Data
+    // 1. Collect Data (Now templates come from DB too)
     const gallery = await getAllImages();
-    const watermarks = await getAllWatermarks(); // Now from DB
+    const watermarks = await getAllWatermarks();
+    const templates = await getAllTemplates();
     
-    // Settings from LocalStorage
+    // Settings still from LocalStorage (small config)
     const settingsStr = localStorage.getItem('nexus_watermark_settings');
     const watermarkSettings = settingsStr ? JSON.parse(settingsStr) : null;
-
-    // Templates from LocalStorage
-    const templatesStr = localStorage.getItem('nexus_prompt_templates');
-    const templates = templatesStr ? JSON.parse(templatesStr) : [];
 
     // 2. Check if empty
     if (gallery.length === 0 && watermarks.length === 0 && templates.length === 0) {
@@ -91,7 +88,7 @@ export const validateBackupFile = async (file: File): Promise<BackupData> => {
 
         if (validatedData.gallery.length === 0 && 
             validatedData.watermarks.length === 0 && 
-            validatedData.templates?.length === 0) {
+            (!validatedData.templates || validatedData.templates.length === 0)) {
             throw new Error("O ficheiro de backup parece estar vazio.");
         }
         
@@ -108,45 +105,42 @@ export const validateBackupFile = async (file: File): Promise<BackupData> => {
 
 /**
  * Destructively restores data from backup.
- * Handles migration from LocalStorage to IndexedDB if needed.
  */
 export const restoreBackup = async (data: BackupData): Promise<void> => {
   try {
     console.log("Starting restore process...", data);
 
-    // 1. Clear Data
-    localStorage.removeItem('nexus_watermarks'); // Legacy cleanup
+    // 1. Clear Data in DBs
+    localStorage.removeItem('nexus_watermarks'); 
+    localStorage.removeItem('nexus_prompt_templates'); // Clean legacy
+    
     await clearAllImages();
     await clearAllWatermarks();
+    await clearAllTemplates(); // Clear DB templates
     console.log("Databases cleared.");
 
-    // 2. Restore Settings (Small data stays in localStorage)
+    // 2. Restore Settings
     if (data.watermarkSettings) {
       try {
         localStorage.setItem('nexus_watermark_settings', JSON.stringify(data.watermarkSettings));
       } catch (e) {
-        console.warn("Could not restore watermark settings (Quota Exceeded?)", e);
+        console.warn("Could not restore watermark settings", e);
       }
     }
 
-    // 3. Restore Templates (LocalStorage)
-    if (data.templates && data.templates.length > 0) {
-        console.log(`Restoring ${data.templates.length} templates...`);
-        try {
-            localStorage.setItem('nexus_prompt_templates', JSON.stringify(data.templates));
-        } catch (e) {
-            console.warn("Could not restore prompt templates (Quota Exceeded?)", e);
-            // In a real app, we might want to alert the user here
-        }
+    // 3. Restore Templates (To IndexedDB now)
+    if (data.templates && Array.isArray(data.templates)) {
+        console.log(`Restoring ${data.templates.length} templates to DB...`);
+        await restoreTemplates(data.templates);
     }
 
-    // 4. Restore Watermarks (To IndexedDB)
+    // 4. Restore Watermarks
     if (data.watermarks && data.watermarks.length > 0) {
       console.log(`Restoring ${data.watermarks.length} watermarks to IndexedDB...`);
       await restoreWatermarks(data.watermarks);
     }
 
-    // 5. Restore Gallery (To IndexedDB)
+    // 5. Restore Gallery
     if (data.gallery && data.gallery.length > 0) {
       console.log(`Restoring ${data.gallery.length} images to IndexedDB...`);
       await restoreGallery(data.gallery);

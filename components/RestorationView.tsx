@@ -23,6 +23,9 @@ export const RestorationView: React.FC<RestorationViewProps> = ({
   const [result, setResult] = useState<GeneratedImageResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   
+  // Local Toggle
+  const [localWatermarkEnabled, setLocalWatermarkEnabled] = useState(true);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,12 +58,14 @@ export const RestorationView: React.FC<RestorationViewProps> = ({
     try {
       const data = await restorePhoto(inputImage.base64Data, inputImage.mimeType);
       
-      // Apply Watermark if enabled
-      if (data.imageUrl && watermarkSettings?.isEnabled && activeWatermark) {
+      // Apply Watermark if enabled (Global && Local)
+      const shouldApply = watermarkSettings?.isEnabled && localWatermarkEnabled && activeWatermark;
+      
+      if (data.imageUrl && shouldApply) {
         const watermarkedUrl = await applyWatermarkToImage(
              data.imageUrl, 
-             activeWatermark, 
-             watermarkSettings
+             activeWatermark!, 
+             watermarkSettings!
         );
         data.imageUrl = watermarkedUrl;
       }
@@ -132,18 +137,19 @@ export const RestorationView: React.FC<RestorationViewProps> = ({
                     {watermarkSettings && onToggleWatermark && (
                         <div className="flex items-center justify-between bg-slate-900/50 p-3 rounded-lg border border-slate-800 mb-6">
                             <div className="flex items-center gap-2">
-                                <Stamp className={`w-4 h-4 ${watermarkSettings.isEnabled ? 'text-indigo-400' : 'text-slate-500'}`} />
+                                <Stamp className={`w-4 h-4 ${localWatermarkEnabled && watermarkSettings.isEnabled ? 'text-indigo-400' : 'text-slate-500'}`} />
                                 <span className="text-sm text-slate-300">Marca d'Água Automática</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                {watermarkSettings.isEnabled && !activeWatermark && (
+                                {localWatermarkEnabled && watermarkSettings.isEnabled && !activeWatermark && (
                                     <span className="text-[10px] text-red-400 mr-2">Nenhuma selecionada</span>
                                 )}
                                 <button 
-                                    onClick={() => onToggleWatermark(!watermarkSettings.isEnabled)}
-                                    className={`w-10 h-5 rounded-full relative transition-colors ${watermarkSettings.isEnabled ? 'bg-indigo-600' : 'bg-slate-600'}`}
+                                    onClick={() => setLocalWatermarkEnabled(!localWatermarkEnabled)}
+                                    className={`w-10 h-5 rounded-full relative transition-colors ${localWatermarkEnabled ? 'bg-indigo-600' : 'bg-slate-600'} ${!watermarkSettings.isEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    disabled={!watermarkSettings.isEnabled}
                                 >
-                                    <div className={`absolute top-1 left-1 bg-white w-3 h-3 rounded-full transition-transform ${watermarkSettings.isEnabled ? 'translate-x-5' : ''}`} />
+                                    <div className={`absolute top-1 left-1 bg-white w-3 h-3 rounded-full transition-transform ${localWatermarkEnabled ? 'translate-x-5' : ''}`} />
                                 </button>
                             </div>
                         </div>

@@ -22,6 +22,9 @@ export const MontageView: React.FC<MontageViewProps> = ({
   const [subjectImage, setSubjectImage] = useState<UploadedFile | null>(null);
   const [instructions, setInstructions] = useState('');
   
+  // Local toggle
+  const [localWatermarkEnabled, setLocalWatermarkEnabled] = useState(true);
+
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<GeneratedImageResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,11 +72,12 @@ export const MontageView: React.FC<MontageViewProps> = ({
         instructions
       );
 
-      // Apply Watermark if enabled
-      if (data.imageUrl && watermarkSettings.isEnabled && activeWatermark) {
+      // Apply Watermark if enabled (Global && Local)
+      const shouldApply = watermarkSettings.isEnabled && localWatermarkEnabled && activeWatermark;
+      if (data.imageUrl && shouldApply) {
         const watermarkedUrl = await applyWatermarkToImage(
              data.imageUrl, 
-             activeWatermark, 
+             activeWatermark!, 
              watermarkSettings
         );
         data.imageUrl = watermarkedUrl;
@@ -192,18 +196,19 @@ export const MontageView: React.FC<MontageViewProps> = ({
                 {/* Watermark Toggle */}
                 <div className="flex items-center justify-between bg-slate-800 p-3 rounded-lg border border-slate-700 mb-6">
                     <div className="flex items-center gap-2">
-                        <Stamp className={`w-4 h-4 ${watermarkSettings.isEnabled ? 'text-indigo-400' : 'text-slate-500'}`} />
+                        <Stamp className={`w-4 h-4 ${localWatermarkEnabled && watermarkSettings.isEnabled ? 'text-indigo-400' : 'text-slate-500'}`} />
                         <span className="text-sm text-slate-300">Marca d'Água Automática</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        {watermarkSettings.isEnabled && !activeWatermark && (
+                        {localWatermarkEnabled && watermarkSettings.isEnabled && !activeWatermark && (
                             <span className="text-[10px] text-red-400 mr-2">Nenhuma selecionada</span>
                         )}
                         <button 
-                            onClick={() => onToggleWatermark(!watermarkSettings.isEnabled)}
-                            className={`w-10 h-5 rounded-full relative transition-colors ${watermarkSettings.isEnabled ? 'bg-indigo-600' : 'bg-slate-600'}`}
+                            onClick={() => setLocalWatermarkEnabled(!localWatermarkEnabled)}
+                            className={`w-10 h-5 rounded-full relative transition-colors ${localWatermarkEnabled ? 'bg-indigo-600' : 'bg-slate-600'} ${!watermarkSettings.isEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={!watermarkSettings.isEnabled}
                         >
-                            <div className={`absolute top-1 left-1 bg-white w-3 h-3 rounded-full transition-transform ${watermarkSettings.isEnabled ? 'translate-x-5' : ''}`} />
+                            <div className={`absolute top-1 left-1 bg-white w-3 h-3 rounded-full transition-transform ${localWatermarkEnabled ? 'translate-x-5' : ''}`} />
                         </button>
                     </div>
                 </div>
@@ -226,7 +231,7 @@ export const MontageView: React.FC<MontageViewProps> = ({
                 result={result} 
                 isLoading={isLoading} 
                 error={error}
-                prompt={instructions} // Allows saving to gallery with the instructions as metadata
+                prompt={instructions} 
              />
         </div>
 

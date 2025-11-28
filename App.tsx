@@ -402,7 +402,7 @@ const AppContent: React.FC = () => {
           <div className="max-w-7xl mx-auto text-center md:text-left text-slate-500 text-sm flex flex-col md:flex-row justify-between items-center gap-4">
             <p>Nexus AI © 2024 - Desenvolvido com Google Gemini</p>
             <div className="flex gap-4">
-              <span className="text-xs text-emerald-500/70">v8.3 (Full Suite)</span>
+              <span className="text-xs text-emerald-500/70 font-bold">v9.0 (Imagen 3 Engine)</span>
               <span className="hover:text-slate-300 cursor-pointer">Termos</span>
               <span className="hover:text-slate-300 cursor-pointer">Privacidade</span>
             </div>

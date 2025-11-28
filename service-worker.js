@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'nexus-ai-cache-v15';
+const CACHE_NAME = 'nexus-ai-cache-v47';
 
 // Recursos essenciais para o "shell" da aplicação
 const PRECACHE_URLS = [

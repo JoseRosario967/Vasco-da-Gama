@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { GeneratedImageResult, Watermark, WatermarkSettings, AdvancedSettings, UploadedFile } from '../types';
 import { generateImageFromText } from '../services/geminiService';
@@ -31,6 +32,9 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
       aspectRatio: '1:1',
       negativePrompt: ''
   });
+
+  // Local Watermark Toggle (Independent from Global)
+  const [localWatermarkEnabled, setLocalWatermarkEnabled] = useState(true);
 
   // Reference Images State
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -116,11 +120,13 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
           referenceImages
       );
       
-      // 2. Apply Watermark if enabled and available
-      if (data.imageUrl && watermarkSettings.isEnabled && activeWatermark) {
+      // 2. Apply Watermark (Check Global AND Local)
+      const shouldApplyWatermark = watermarkSettings.isEnabled && localWatermarkEnabled && activeWatermark;
+
+      if (data.imageUrl && shouldApplyWatermark) {
          const watermarkedUrl = await applyWatermarkToImage(
              data.imageUrl, 
-             activeWatermark, 
+             activeWatermark!, 
              watermarkSettings
          );
          data.imageUrl = watermarkedUrl;
@@ -176,13 +182,24 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
                                 Modelos
                             </button>
                         </div>
-                        <textarea
-                            value={prompt}
-                            onChange={(e) => setPrompt(e.target.value)}
-                            placeholder="Descreva a imagem que pretende criar em detalhe... (ex: Uma cidade futurista com carros voadores ao pôr do sol, estilo cyberpunk)"
-                            className="w-full h-32 bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                            disabled={isLoading}
-                        />
+                        <div className="relative">
+                            <textarea
+                                value={prompt}
+                                onChange={(e) => setPrompt(e.target.value)}
+                                placeholder="Descreva a imagem que pretende criar em detalhe... (ex: Uma cidade futurista com carros voadores ao pôr do sol, estilo cyberpunk)"
+                                className="w-full h-32 bg-slate-900 border border-slate-700 rounded-lg p-3 pr-10 text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                                disabled={isLoading}
+                            />
+                            {prompt && (
+                                <button 
+                                    onClick={() => setPrompt('')}
+                                    className="absolute top-2 right-2 p-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full transition-colors"
+                                    title="Limpar texto"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {/* Image References Upload */}
@@ -240,18 +257,20 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
                     {/* Watermark Toggle */}
                     <div className="flex items-center justify-between bg-slate-900/50 p-3 rounded-lg border border-slate-800">
                         <div className="flex items-center gap-2">
-                            <Stamp className={`w-4 h-4 ${watermarkSettings.isEnabled ? 'text-indigo-400' : 'text-slate-500'}`} />
+                            <Stamp className={`w-4 h-4 ${localWatermarkEnabled && watermarkSettings.isEnabled ? 'text-indigo-400' : 'text-slate-500'}`} />
                             <span className="text-sm text-slate-300">Marca d'Água Automática</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            {watermarkSettings.isEnabled && !activeWatermark && (
+                            {localWatermarkEnabled && watermarkSettings.isEnabled && !activeWatermark && (
                                 <span className="text-[10px] text-red-400 mr-2">Nenhuma selecionada</span>
                             )}
                             <button 
-                                onClick={() => onToggleWatermark(!watermarkSettings.isEnabled)}
-                                className={`w-10 h-5 rounded-full relative transition-colors ${watermarkSettings.isEnabled ? 'bg-indigo-600' : 'bg-slate-600'}`}
+                                onClick={() => setLocalWatermarkEnabled(!localWatermarkEnabled)}
+                                className={`w-10 h-5 rounded-full relative transition-colors ${localWatermarkEnabled ? 'bg-indigo-600' : 'bg-slate-600'} ${!watermarkSettings.isEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                disabled={!watermarkSettings.isEnabled}
+                                title={!watermarkSettings.isEnabled ? "Ative a Marca d'Água no menu lateral primeiro" : "Ligar/Desligar nesta aplicação"}
                             >
-                                <div className={`absolute top-1 left-1 bg-white w-3 h-3 rounded-full transition-transform ${watermarkSettings.isEnabled ? 'translate-x-5' : ''}`} />
+                                <div className={`absolute top-1 left-1 bg-white w-3 h-3 rounded-full transition-transform ${localWatermarkEnabled ? 'translate-x-5' : ''}`} />
                             </button>
                         </div>
                     </div>

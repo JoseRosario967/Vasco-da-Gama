@@ -5,7 +5,10 @@ import { AspectRatio, GeneratedImageResult, ImageQuality, Recipe, GardenTips, We
 // Initialize the client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-const MODEL_NAME = 'gemini-2.5-flash-image';
+const FLASH_MODEL = 'gemini-2.5-flash-image';
+const PRO_MODEL = 'gemini-3-pro-image-preview'; // High Fidelity Model
+const IMAGEN_3_MODEL = 'imagen-3.0-generate-001'; // Standard High Quality
+const IMAGEN_4_MODEL = 'imagen-4.0-generate-001'; // Ultra High Quality (Experimental/Private Preview)
 const ANALYSIS_MODEL = 'gemini-2.5-flash';
 const TTS_MODEL = 'gemini-2.5-flash-preview-tts';
 
@@ -53,7 +56,7 @@ const enhancePrompt = (originalPrompt: string, quality: ImageQuality, negativePr
     let finalPrompt = originalPrompt;
 
     if (quality === 'high') {
-        finalPrompt += " . Highly detailed, photorealistic, 8k resolution, cinematic lighting, sharp focus, masterpiece.";
+        finalPrompt += " . Photorealistic, 8k resolution, highly detailed, sharp focus, cinematic lighting.";
     }
 
     if (negativePrompt && negativePrompt.trim()) {
@@ -70,6 +73,7 @@ interface ImageInput {
 
 /**
  * Generates an image based on a text prompt AND optional reference images.
+ * STRATEGY: Imagen 4 -> Fallback to Imagen 3 -> Fallback to Gemini Pro -> Fallback to Flash
  */
 export const generateImageFromText = async (
   prompt: string,
@@ -81,7 +85,64 @@ export const generateImageFromText = async (
   try {
     const finalPrompt = enhancePrompt(prompt, quality, negativePrompt);
 
-    // Build parts array
+    // 1. HIGH QUALITY MODE (Pure Creation)
+    if (quality === 'high' && referenceImages.length === 0) {
+        
+        // TIER 1: Try IMAGEN 4 (The "Ferrari")
+        try {
+            console.log("Attempting generation with Imagen 4...");
+            const response = await ai.models.generateImages({
+                model: IMAGEN_4_MODEL,
+                prompt: finalPrompt,
+                config: {
+                    numberOfImages: 1,
+                    aspectRatio: aspectRatio,
+                    outputMimeType: 'image/jpeg'
+                }
+            });
+
+            const base64 = response.generatedImages?.[0]?.image?.imageBytes;
+            if (base64) {
+                console.log("Success with Imagen 4!");
+                return { 
+                    imageUrl: `data:image/jpeg;base64,${base64}`, 
+                    textOutput: null,
+                    modelUsed: 'Imagen 4 (Ultra)'
+                };
+            }
+        } catch (imagen4Error: any) {
+            console.warn("Imagen 4 unavailable or failed. Falling back to Imagen 3.", imagen4Error);
+            
+            // TIER 2: Fallback to IMAGEN 3 (The "Porsche")
+            try {
+                const response = await ai.models.generateImages({
+                    model: IMAGEN_3_MODEL,
+                    prompt: finalPrompt,
+                    config: {
+                        numberOfImages: 1,
+                        aspectRatio: aspectRatio,
+                        outputMimeType: 'image/jpeg'
+                    }
+                });
+
+                const base64 = response.generatedImages?.[0]?.image?.imageBytes;
+                if (base64) {
+                    console.log("Success with Imagen 3!");
+                    return { 
+                        imageUrl: `data:image/jpeg;base64,${base64}`, 
+                        textOutput: null,
+                        modelUsed: 'Imagen 3 (High)'
+                    };
+                }
+            } catch (imagen3Error: any) {
+                console.warn("Imagen 3 failed. Falling back to Gemini Pro.", imagen3Error);
+                // Continue to Tier 3 (Gemini Pro) below
+            }
+        }
+    }
+
+    // 2. STANDARD MODE / REFERENCE IMAGE MODE (Gemini Models)
+    // TIER 3: Gemini 3 Pro or Flash
     const parts: any[] = [];
 
     // Add Reference Images first
@@ -99,19 +160,29 @@ export const generateImageFromText = async (
     // Add Text Prompt
     parts.push({ text: finalPrompt });
 
+    // Use Pro if high quality requested (and not using Imagen), otherwise Flash
+    const modelToUse = quality === 'high' ? PRO_MODEL : FLASH_MODEL;
+    const imgConfig: any = { aspectRatio: aspectRatio };
+    
+    if (modelToUse === PRO_MODEL) {
+        imgConfig.imageSize = "2K";
+    }
+
+    console.log(`Generating with fallback model: ${modelToUse}`);
     const response = await ai.models.generateContent({
-      model: MODEL_NAME,
+      model: modelToUse,
       contents: {
         parts: parts
       },
       config: {
-        imageConfig: {
-          aspectRatio: aspectRatio,
-        },
+        imageConfig: imgConfig,
       },
     });
 
-    return parseResponse(response);
+    const result = parseResponse(response);
+    result.modelUsed = modelToUse === PRO_MODEL ? 'Gemini 3 Pro' : 'Gemini Flash';
+    return result;
+
   } catch (error: any) {
     console.error("Gemini Generation Error:", error);
     throw new Error(error.message || "Falha ao gerar a imagem.");
@@ -120,23 +191,30 @@ export const generateImageFromText = async (
 
 /**
  * Edits existing images based on a text prompt.
- * Supports multiple input images.
+ * Uses PRO model for maximum fidelity.
  */
 export const editImageWithPrompt = async (
   images: ImageInput[],
   prompt: string,
   aspectRatio: AspectRatio = "1:1",
   quality: ImageQuality = 'standard'
-  // Note: Negative prompt is typically not supported/reliable in edit mode same way as generation
 ): Promise<GeneratedImageResult> => {
   try {
-    const enhancedPrompt = enhancePrompt(prompt, quality);
+    const baseInstruction = prompt;
     
-    // CRITICAL FIX: Explicitly tell the model to generate a new image file.
-    // Without this, Gemini 2.5 often chats about the image instead of editing it.
-    const finalPrompt = `Generate a new image based on the provided input and this instruction: ${enhancedPrompt}`;
+    // TEXTURE PRESERVATION PROMPT
+    const finalPrompt = `
+      Instructions: "${baseInstruction}"
+      
+      STRICT PHOTOREALISM RULES:
+      1. Output a HIGH-TEXTURE photograph.
+      2. PRESERVE GRAIN: Do NOT remove existing film grain or noise. The output must look like an analog photo scan.
+      3. SKIN TEXTURE: Maintain pores, wrinkles, and micro-details. Do NOT smooth skin. Avoid "waxy" or "plastic" looks.
+      4. IDENTITY: Keep facial features indistinguishable from the source.
+      5. Do not beautify. Keep it raw and realistic.
+    `;
 
-    // Build parts array: [Image1, Image2, ..., Text]
+    // Build parts array
     const parts: any[] = images.map(img => ({
         inlineData: {
             data: img.base64Data,
@@ -147,14 +225,23 @@ export const editImageWithPrompt = async (
     parts.push({ text: finalPrompt });
 
     const response = await ai.models.generateContent({
-      model: MODEL_NAME,
+      model: PRO_MODEL, 
       contents: {
         parts: parts,
       },
-      // Config removed to allow model to infer aspect ratio from input images
+      config: {
+        imageConfig: {
+            imageSize: "2K" 
+        },
+        // Increased temperature to prevent "averaging/smoothing" effect.
+        temperature: 0.55, 
+        topP: 0.95
+      }
     });
 
-    return parseResponse(response);
+    const result = parseResponse(response);
+    result.modelUsed = 'Gemini 3 Pro (Edit)';
+    return result;
   } catch (error: any) {
     console.error("Gemini Editing Error:", error);
     throw new Error(error.message || "Falha ao editar a imagem.");
@@ -162,7 +249,7 @@ export const editImageWithPrompt = async (
 };
 
 /**
- * Creates a montage by combining a background and a subject image.
+ * Creates a montage.
  */
 export const createMontage = async (
   bgBase64: string,
@@ -174,27 +261,31 @@ export const createMontage = async (
   try {
     const prompt = `
       Instructions: ${instructions}
-      
       Tasks:
-      1. Use the FIRST image provided as the BACKGROUND/ENVIRONMENT.
-      2. Use the SECOND image provided as the SUBJECT/OBJECT source.
-      3. Seamlessly integrate the subject into the background based on the instructions.
-      4. Ensure lighting, shadows, and perspective match perfectly to create a realistic montage.
-      5. Output ONLY the generated image.
+      1. Use FIRST image as BACKGROUND.
+      2. Use SECOND image as SUBJECT.
+      3. Integrate subject into background realistically.
+      4. Match lighting and shadows.
     `;
 
     const response = await ai.models.generateContent({
-      model: MODEL_NAME,
+      model: PRO_MODEL, // Using PRO for better blending
       contents: {
         parts: [
           { inlineData: { data: bgBase64, mimeType: bgMime } },
           { inlineData: { data: fgBase64, mimeType: fgMime } },
           { text: prompt }
         ]
+      },
+      config: {
+        imageConfig: { imageSize: "2K" },
+        temperature: 0.5
       }
     });
 
-    return parseResponse(response);
+    const result = parseResponse(response);
+    result.modelUsed = 'Gemini 3 Pro (Montage)';
+    return result;
   } catch (error: any) {
     console.error("Gemini Montage Error:", error);
     throw new Error(error.message || "Falha ao criar a montagem.");
@@ -210,27 +301,36 @@ export const restorePhoto = async (
 ): Promise<GeneratedImageResult> => {
   try {
     const prompt = `
-      Generate a restored version of this image.
+      Act as a professional photo restorer using high-end analog techniques.
+      
       Tasks:
-      1. Remove scratches, dust, and creases.
-      2. Reduce noise and grain.
-      3. Improve sharpness and detail (upscale).
-      4. Correct fading colors or balance black and white contrast.
-      5. Keep facial features realistic and faithful to the original.
+      1. Fix major damage (scratches, dust, tears).
+      2. DO NOT DENOISE. Keep the original film grain and texture.
+      3. If the face is blurry, sharpen it by adding realistic skin texture (pores), NOT by smoothing it.
+      4. Avoid the "airbrushed" or "AI look". The result must look like a high-resolution scan of the original photograph.
+      5. Enhance contrast and definition without losing the vintage feel.
       6. Return only the restored image.
     `;
 
     const response = await ai.models.generateContent({
-      model: MODEL_NAME,
+      model: PRO_MODEL, 
       contents: {
         parts: [
           { inlineData: { data: imageBase64, mimeType: mimeType } },
           { text: prompt }
         ]
+      },
+      config: {
+        imageConfig: {
+            imageSize: "2K"
+        },
+        temperature: 0.55
       }
     });
 
-    return parseResponse(response);
+    const result = parseResponse(response);
+    result.modelUsed = 'Gemini 3 Pro (Restore)';
+    return result;
   } catch (error: any) {
     console.error("Restoration Error:", error);
     throw new Error(error.message || "Falha ao restaurar a fotografia.");
@@ -238,7 +338,39 @@ export const restorePhoto = async (
 };
 
 /**
- * Analyzes two images to find the prompt that caused the transformation.
+ * Reverse Engineering
+ */
+export const discoverImagePrompt = async (
+    base64: string,
+    mimeType: string
+  ): Promise<string> => {
+    try {
+      const prompt = `
+        Act as a Prompt Engineering Expert.
+        Analyze this image and write the exact TEXT PROMPT to generate it.
+        Include Subject, Environment, Style, Lighting, Camera details.
+        Response in English only.
+      `;
+  
+      const response = await ai.models.generateContent({
+        model: ANALYSIS_MODEL,
+        contents: {
+          parts: [
+            { inlineData: { data: base64, mimeType: mimeType } },
+            { text: prompt }
+          ]
+        }
+      });
+  
+      return response.text || "Não foi possível analisar a imagem.";
+    } catch (error: any) {
+      console.error("Prompt Discovery Error:", error);
+      throw new Error(error.message || "Falha ao descobrir o prompt.");
+    }
+  };
+
+/**
+ * Analyze Differences
  */
 export const analyzeImageDifference = async (
     originalBase64: string,
@@ -248,14 +380,8 @@ export const analyzeImageDifference = async (
   ): Promise<string> => {
     try {
       const prompt = `
-        Analisa estas duas imagens cuidadosamente.
-        A primeira imagem é a ORIGINAL.
-        A segunda imagem é a EDITADA.
-        
-        A tua tarefa é identificar qual foi o comando de texto (prompt) usado numa IA Generativa para transformar a imagem ORIGINAL na EDITADA.
-        
-        Sê específico sobre mudanças de estilo, objetos adicionados, iluminação ou alterações de cor.
-        Responde APENAS com o prompt sugerido, em Português, sem introduções ou explicações adicionais.
+        Analisa estas duas imagens. Identifica o prompt usado para transformar a ORIGINAL na EDITADA.
+        Responde APENAS com o prompt sugerido em Português.
       `;
   
       const response = await ai.models.generateContent({
@@ -277,7 +403,7 @@ export const analyzeImageDifference = async (
   };
 
 /**
- * Chef Michelin: Generate Recipe from Ingredients/Image
+ * Chef Recipe
  */
 export const generateChefRecipe = async (
   ingredientsText: string,
@@ -286,30 +412,13 @@ export const generateChefRecipe = async (
 ): Promise<Recipe> => {
   try {
     const parts: any[] = [];
-    
-    if (image) {
-      parts.push({ inlineData: { data: image.base64Data, mimeType: image.mimeType } });
-    }
+    if (image) parts.push({ inlineData: { data: image.base64Data, mimeType: image.mimeType } });
 
     const promptText = `
-      Act as a Michelin Star Chef.
-      Analyze the provided ingredients/image and create a GOURMET recipe.
-      
-      Additional Ingredients Provided: ${ingredientsText}
-      Dietary Restrictions: ${restrictions.join(', ')}
-      
-      Return the response STRICTLY in valid JSON format with this structure:
-      {
-        "title": "Name of the dish",
-        "description": "A sophisticated description of the dish",
-        "ingredients": ["List", "of", "ingredients", "with", "quantities"],
-        "steps": ["Step 1", "Step 2", "etc"],
-        "prepTime": "e.g. 45 mins",
-        "difficulty": "Easy/Medium/Hard",
-        "calories": "Approx calories",
-        "chefTips": "A professional tip for plating or flavor"
-      }
-      Do not add markdown code blocks. Just the JSON string.
+      Act as a Michelin Star Chef. Create a gourmet recipe JSON.
+      Ingredients: ${ingredientsText}
+      Restrictions: ${restrictions.join(', ')}
+      Format: {"title":"", "description":"", "ingredients":[], "steps":[], "prepTime":"", "difficulty":"", "calories":"", "chefTips":""}
     `;
 
     parts.push({ text: promptText });
@@ -325,62 +434,31 @@ export const generateChefRecipe = async (
 
   } catch (error: any) {
     console.error("Chef Generation Error:", error);
-    throw new Error("Falha ao gerar a receita. Tente novamente.");
+    throw new Error("Falha ao gerar a receita.");
   }
 };
 
 /**
- * Garden Studio: Generate Tips (Legacy)
+ * Garden Tips (Legacy)
  */
-export const generateGardenTips = async (
-  month: string,
-  region: string
-): Promise<GardenTips> => {
+export const generateGardenTips = async (month: string, region: string): Promise<GardenTips> => {
   try {
-    const prompt = `
-      Age como um especialista em agricultura portuguesa ("O Borda d'Água").
-      Gera um guia de cultivo para:
-      Mês: ${month}
-      Região de Portugal: ${region}
-      
-      Distingue RIGOROSAMENTE entre Semear (Sementes) e Plantar (Mudas).
-      
-      Responde ESTRITAMENTE em formato JSON com esta estrutura:
-      {
-        "sow": ["Lista de o que semear"],
-        "plant": ["Lista de o que plantar"],
-        "harvest": ["O que se colhe agora"],
-        "maintenance": ["Tarefas de manutenção importantes"],
-        "moonPhase": "Dica baseada na lua para este mês (simulada)"
-      }
-      Sem markdown. Apenas JSON.
-    `;
-
+    const prompt = `Garden guide for ${month}, ${region}. JSON: {"sow":[], "plant":[], "harvest":[], "maintenance":[], "moonPhase":""}`;
     const response = await ai.models.generateContent({
       model: ANALYSIS_MODEL,
       contents: { parts: [{ text: prompt }] }
     });
-
-    const text = response.text || "{}";
-    const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(jsonStr) as GardenTips;
-
+    return JSON.parse(response.text?.replace(/```json/g, '').replace(/```/g, '').trim() || "{}") as GardenTips;
   } catch (error: any) {
-    console.error("Garden Generation Error:", error);
-    throw new Error("Falha ao gerar dicas de jardinagem.");
+    throw new Error("Falha ao gerar dicas.");
   }
 };
 
 /**
- * Garden Studio: Generate Personalized Plan (New Dashboard)
+ * Garden Plan (Dashboard)
  */
 export const generateGardenPlan = async (
-  month: string,
-  region: string,
-  method: 'Semear (Sementes)' | 'Plantar (Mudas)',
-  family: string,
-  doubts: string,
-  specificPlant: string = '' // NEW: Optional specific plant override
+  month: string, region: string, method: string, family: string, doubts: string, specificPlant: string = ''
 ): Promise<GardenPlan> => {
   try {
     const prompt = `
@@ -402,20 +480,18 @@ export const generateGardenPlan = async (
       Se "Planta Específica" estiver preenchido (ex: "Laranjeira", "Batatas", "Ervilhas"), IGNORA a "Família" genérica e foca TODAS as tarefas, dicas de solo e métodos EXCLUSIVAMENTE nessa planta específica. O relatório deve ser monográfico sobre essa cultura.
       Se "Planta Específica" estiver vazio, usa a "Família" para conselhos gerais.
 
-      Se o método for "Semear", foca em germinação, profundidade da semente, sementeira direta vs alfobre.
-      Se o método for "Plantar", foca no transplante, espaçamento e adaptação da muda.
-      
-      Se o utilizador colocou uma dúvida específica, responde com rigor técnico mas linguagem acessível no campo "expertAnswer".
+      INSTRUÇÃO CRÍTICA DE LÍNGUA:
+      Escreve todo o conteúdo (Título, Resumo, Dicas, Tarefas) EXCLUSIVAMENTE em PORTUGUÊS DE PORTUGAL (PT-PT). Não uses Espanhol.
 
       ESTRUTURA JSON OBRIGATÓRIA:
       {
-        "title": "Título curto e motivador (ex: Guia para Laranjeiras em Novembro)",
-        "summary": "Resumo de 2 frases sobre o que fazer neste mês nesta região para a cultura selecionada.",
-        "methodAdvice": "Conselhos específicos para o método escolhido (${method}).",
-        "soilTips": "Dicas de preparação de solo para ${specificPlant || family} na região ${region}.",
+        "title": "Título curto e motivador",
+        "summary": "Resumo de 2 frases sobre o que fazer.",
+        "methodAdvice": "Conselhos específicos para o método.",
+        "soilTips": "Dicas de preparação de solo.",
         "tasks": ["Tarefa 1", "Tarefa 2", "Tarefa 3", "Tarefa 4"],
-        "expertAnswer": "Resposta à dúvida: ${doubts}. Se não houver dúvida, dá uma curiosidade sobre ${specificPlant || family}.",
-        "moonPhase": "Melhor fase lunar para esta atividade este mês."
+        "expertAnswer": "Resposta à dúvida: ${doubts}.",
+        "moonPhase": "Melhor fase lunar."
       }
       
       Responde apenas com o JSON válido. Sem Markdown.
@@ -437,7 +513,7 @@ export const generateGardenPlan = async (
 };
 
 /**
- * Garden Studio: Generate Detailed Crop Report (Encyclopedia)
+ * Crop Details (Encyclopedia)
  */
 export const generateCropDetails = async (plantName: string): Promise<CropReport> => {
   try {
@@ -445,31 +521,30 @@ export const generateCropDetails = async (plantName: string): Promise<CropReport
       Age como um Engenheiro Agrónomo Sénior especializado no clima de Portugal.
       Cria uma Ficha Técnica Detalhada para a cultura: "${plantName}".
       
-      A informação deve ser rigorosa e técnica, mas acessível.
+      Para o campo "imageKeywords", fornece 3-5 palavras-chave em INGLÊS que descrevam visualmente o produto principal (ex: "red ripe tomatoes on vine close up", "orange carrot roots soil", "broad bean pods green").
       
-      Para o campo "imageKeywords", fornece 3-5 palavras-chave em INGLÊS que descrevam visualmente o produto principal (ex: "red ripe tomatoes on vine close up", "orange carrot roots soil", "broad bean pods green"). Isto servirá para gerar a imagem correta.
+      INSTRUÇÃO CRÍTICA DE LÍNGUA:
+      O conteúdo do JSON (nomes, descrições, listas) deve estar EXCLUSIVAMENTE em PORTUGUÊS DE PORTUGAL (PT-PT). Não uses Espanhol.
       
       Responde ESTRITAMENTE em formato JSON com esta estrutura:
       {
         "name": "${plantName}",
         "scientificName": "Nome científico",
-        "imageKeywords": "Palavras chave visuais em INGLÊS (focadas no fruto/produto)",
+        "imageKeywords": "Palavras chave visuais em INGLÊS",
         "family": "Família botânica",
-        "plantingSeason": "Meses ideais para semear/plantar (em Portugal)",
-        "harvestTime": "Tempo médio desde o plantio até à colheita",
-        "soil": {
-          "type": "Tipo de solo ideal (ex: arenoso, argiloso, rico em húmus)",
-          "ph": "pH ideal"
-        },
-        "water": "Necessidades hídricas e frequência de rega",
-        "sun": "Exposição solar necessária",
-        "pests": ["Lista de pragas comuns"],
-        "diseases": ["Lista de doenças comuns"],
-        "treatments": "Tratamentos recomendados (biológicos/orgânicos e convencionais)",
-        "pruning": "Instruções de poda (se aplicável) e época ideal",
-        "associations": "Plantas companheiras (favoráveis) e antagónicas"
+        "origin": "Origem geográfica e breve contexto histórico da planta",
+        "plantingSeason": "Meses ideais para semear/plantar",
+        "harvestTime": "Tempo médio até à colheita",
+        "soil": { "type": "Tipo de solo", "ph": "pH ideal" },
+        "water": "Necessidades hídricas",
+        "sun": "Exposição solar",
+        "pests": ["Praga 1", "Praga 2"],
+        "diseases": ["Doença 1", "Doença 2"],
+        "treatments": "Tratamentos recomendados",
+        "pruning": "Instruções de poda",
+        "associations": "Plantas companheiras"
       }
-      Não uses markdown. Apenas JSON.
+      Apenas JSON.
     `;
 
     const response = await ai.models.generateContent({
@@ -488,255 +563,114 @@ export const generateCropDetails = async (plantName: string): Promise<CropReport
 };
 
 /**
- * Weather: Real-time Grounding + Portuguese Slang
+ * Weather
  */
 export const generateWeatherReport = async (district: string): Promise<WeatherReport> => {
   try {
     const response = await ai.models.generateContent({
         model: ANALYSIS_MODEL,
-        contents: `Consulta a previsão meteorológica atual e para as próximas 24h em ${district}, Portugal.`,
-        config: {
-            tools: [{ googleSearch: {} }] // Activate Grounding
-        }
+        contents: `Previsão do tempo para ${district}, Portugal.`,
+        config: { tools: [{ googleSearch: {} }] }
     });
-
-    // Second pass: Format the grounded data into JSON with personality
-    const groundedText = response.text;
-    const formatPrompt = `
-      Baseado na seguinte informação meteorológica:
-      "${groundedText}"
-
-      Cria um relatório JSON ESTRITO com o seguinte formato, usando LINGUAGEM POPULAR PORTUGUESA (ex: "Está um briol de rachar", "Vento de levar as telhas", "Sol de pouca dura"):
-      {
-        "district": "${district}",
-        "currentTemp": "XXºC",
-        "condition": "Descrição simples",
-        "popularSummary": "Resumo engraçado/popular do tempo",
-        "hourlyForecast": [
-           {"time": "09:00", "temp": "15ºC", "icon": "sun/cloud/rain"},
-           {"time": "12:00", "temp": "18ºC", "icon": "sun/cloud/rain"},
-           {"time": "15:00", "temp": "19ºC", "icon": "sun/cloud/rain"},
-           {"time": "18:00", "temp": "16ºC", "icon": "sun/cloud/rain"}
-        ],
-        "clothingTip": "Dica de vestuário prática"
-      }
-      Apenas JSON.
-    `;
-
-    const formatResponse = await ai.models.generateContent({
-        model: ANALYSIS_MODEL,
-        contents: formatPrompt
-    });
-
-    const text = formatResponse.text || "{}";
-    const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(jsonStr) as WeatherReport;
-
+    const formatPrompt = `Baseado nisto: "${response.text}", cria JSON com linguagem popular PT: {"district":"", "currentTemp":"", "condition":"", "popularSummary":"", "hourlyForecast":[{"time":"","temp":"","icon":""}], "clothingTip":""}`;
+    const formatRes = await ai.models.generateContent({ model: ANALYSIS_MODEL, contents: formatPrompt });
+    return JSON.parse(formatRes.text?.replace(/```json/g, '').replace(/```/g, '').trim() || "{}") as WeatherReport;
   } catch (error: any) {
-    console.error("Weather Generation Error:", error);
-    throw new Error("Falha ao obter meteorologia. O serviço de pesquisa pode estar indisponível.");
+    throw new Error("Falha ao obter meteorologia.");
   }
 };
 
 /**
- * Poetry & Music Generator
+ * Poetry
  */
-export const generatePoetry = async (
-  topic: string,
-  type: 'Poema' | 'Letra de Música' | 'Rap' | 'Verso' | 'Prosa' | 'Texto',
-  style: string
-): Promise<PoemResult> => {
+export const generatePoetry = async (topic: string, type: string, style: string): Promise<PoemResult> => {
   try {
-    const prompt = `
-      Escreve um(a) ${type} sobre o tema: "${topic}".
-      Estilo: ${style}.
-      Língua: Português.
-      
-      Responde em JSON:
-      {
-        "title": "Um título criativo",
-        "content": "O texto completo com quebras de linha (\\n)",
-        "style": "${style}"
-      }
-    `;
-
-    const response = await ai.models.generateContent({
-        model: ANALYSIS_MODEL,
-        contents: prompt
-    });
-
-    const text = response.text || "{}";
-    const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(jsonStr) as PoemResult;
-
+    const prompt = `Escreve ${type} sobre ${topic}. Estilo ${style}. JSON: {"title":"", "content":"", "style":""}`;
+    const response = await ai.models.generateContent({ model: ANALYSIS_MODEL, contents: prompt });
+    return JSON.parse(response.text?.replace(/```json/g, '').replace(/```/g, '').trim() || "{}") as PoemResult;
   } catch (error: any) {
-    console.error("Poetry Generation Error:", error);
     throw new Error("Falha ao gerar poesia.");
   }
 };
 
 /**
- * Universal Translator
+ * Translation
  */
-export const generateTranslation = async (
-  text: string,
-  targetLang: string
-): Promise<string> => {
+export const generateTranslation = async (text: string, targetLang: string): Promise<string> => {
   try {
-    const prompt = `
-      Traduz o seguinte texto para ${targetLang}.
-      Deteta automaticamente a língua de origem.
-      
-      Texto Original: "${text}"
-      
-      Regras:
-      1. Mantém o tom e o estilo do original.
-      2. Se houver gírias, adapta para equivalentes culturais em ${targetLang}.
-      3. Retorna APENAS o texto traduzido, nada mais.
-    `;
-
     const response = await ai.models.generateContent({
       model: ANALYSIS_MODEL,
-      contents: { parts: [{ text: prompt }] }
+      contents: { parts: [{ text: `Traduz para ${targetLang}: "${text}"` }] }
     });
-
-    return response.text || "Erro na tradução.";
+    return response.text || "Erro.";
   } catch (error: any) {
-    console.error("Translation Error:", error);
-    throw new Error("Falha ao traduzir texto.");
+    throw new Error("Falha na tradução.");
   }
 };
 
-// --- AUDIO UTILITIES ---
-
-/**
- * Creates a valid WAV header for PCM data.
- * Gemini returns raw PCM at 24kHz, 16-bit, Mono.
- * Web Audio API uses 32-bit float typically, so we use AudioContext to decode/resample correctly.
- */
-// Kept for reference, but main implementation below uses AudioContext for robustness
+// --- AUDIO (TTS) ---
 const createWavHeader = (dataLength: number, sampleRate: number): ArrayBuffer => {
-    const numChannels = 1;
-    const bitsPerSample = 16;
-    
     const buffer = new ArrayBuffer(44);
     const view = new DataView(buffer);
-  
-    // RIFF identifier
-    view.setUint32(0, 0x52494646, false); // "RIFF"
-    // file length
+    view.setUint32(0, 0x52494646, false); // RIFF
     view.setUint32(4, 36 + dataLength, true);
-    // RIFF type
-    view.setUint32(8, 0x57415645, false); // "WAVE"
-    // format chunk identifier
-    view.setUint32(12, 0x666d7420, false); // "fmt "
-    // format chunk length
+    view.setUint32(8, 0x57415645, false); // WAVE
+    view.setUint32(12, 0x666d7420, false); // fmt 
     view.setUint32(16, 16, true);
-    // sample format (1 = PCM)
-    view.setUint16(20, 1, true);
-    // channel count
-    view.setUint16(22, numChannels, true);
-    // sample rate
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, 1, true); // Mono
     view.setUint32(24, sampleRate, true);
-    // byte rate (sampleRate * blockAlign)
-    view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true);
-    // block align (channel count * bytes per sample)
-    view.setUint16(32, numChannels * (bitsPerSample / 8), true);
-    // bits per sample
-    view.setUint16(34, bitsPerSample, true);
-    // data chunk identifier
-    view.setUint32(36, 0x64617461, false); // "data"
-    // data chunk length
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    view.setUint32(36, 0x64617461, false); // data
     view.setUint32(40, dataLength, true);
-  
     return buffer;
-  };
+};
 
-/**
- * Text to Speech (TTS) Generator
- */
 export const generateSpeech = async (text: string, voiceName: string = 'Kore'): Promise<Blob> => {
   try {
-    console.log(`Generating speech using voice: ${voiceName}`);
-    
-    // Combine instruction into text for model compatibility
-    const promptText = `Lê o seguinte texto com sotaque nativo de Portugal Europeu: ${text}`;
-
     const response = await ai.models.generateContent({
       model: TTS_MODEL,
-      contents: {
-        parts: [{ text: promptText }]
-      },
-      config: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: voiceName }
-          }
-        }
-      }
+      contents: { parts: [{ text: `Lê com sotaque de Portugal: ${text}` }] },
+      config: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } }
     });
-
-    // The audio data comes in base64 PCM
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    const base64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!base64) throw new Error("Sem áudio.");
     
-    if (!base64Audio) {
-      throw new Error("Não foi gerado nenhum áudio.");
-    }
-
-    // Convert Base64 to ArrayBuffer
-    const binaryString = atob(base64Audio);
-    const len = binaryString.length;
+    const binary = atob(base64);
+    const len = binary.length;
     const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    const arrayBuffer = bytes.buffer;
+    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
 
-    // Use Web Audio API to decode PCM data
-    // Gemini 2.5 TTS typically returns 24kHz raw PCM. 
-    // Browsers' AudioContext can often decode raw frames if wrapped, or we manually process.
-    // However, decodeAudioData expects a file structure (wav/mp3) usually.
-    // Let's wrap it in a 24kHz WAV header first to allow decodeAudioData to work.
-    
-    const wavWith24kHeader = new Uint8Array(44 + len);
-    wavWith24kHeader.set(new Uint8Array(createWavHeader(len, 24000)), 0);
-    wavWith24kHeader.set(bytes, 44);
-
+    // Audio Context Decoding
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const audioBuffer = await audioContext.decodeAudioData(wavWith24kHeader.buffer.slice(0)); // clone to avoid detach issues
+    const wavWithHeader = new Uint8Array(44 + len);
+    wavWithHeader.set(new Uint8Array(createWavHeader(len, 24000)), 0);
+    wavWithHeader.set(bytes, 44);
+    
+    const audioBuffer = await audioContext.decodeAudioData(wavWithHeader.buffer.slice(0)); 
 
-    // Now re-encode to standard 44.1kHz WAV to ensure universal playback compatibility
     const offlineCtx = new OfflineAudioContext(1, audioBuffer.duration * 44100, 44100);
     const source = offlineCtx.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(offlineCtx.destination);
     source.start();
-    const renderedBuffer = await offlineCtx.startRendering();
+    const rendered = await offlineCtx.startRendering();
 
-    // Export to WAV (16-bit PCM, 44.1kHz)
-    const length = renderedBuffer.length * 2;
-    const resultBuffer = new ArrayBuffer(44 + length);
+    const resultLen = rendered.length * 2;
+    const resultBuffer = new ArrayBuffer(44 + resultLen);
     const view = new DataView(resultBuffer);
-    
-    // Write Header for 44.1kHz
-    const header = createWavHeader(length, 44100);
-    new Uint8Array(resultBuffer).set(new Uint8Array(header), 0);
-
-    // Write Data (Float to Int16)
-    const channelData = renderedBuffer.getChannelData(0);
+    new Uint8Array(resultBuffer).set(new Uint8Array(createWavHeader(resultLen, 44100)), 0);
+    const channel = rendered.getChannelData(0);
     let offset = 44;
-    for (let i = 0; i < renderedBuffer.length; i++) {
-        let sample = Math.max(-1, Math.min(1, channelData[i]));
-        sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
-        view.setInt16(offset, sample, true);
+    for (let i = 0; i < rendered.length; i++) {
+        let s = Math.max(-1, Math.min(1, channel[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
         offset += 2;
     }
-
     return new Blob([resultBuffer], { type: 'audio/wav' });
-
-  } catch (error: any) {
-    console.error("TTS Error:", error);
-    throw new Error("Falha ao gerar áudio. Tente novamente.");
+  } catch (e) {
+    throw new Error("Falha no áudio.");
   }
 };

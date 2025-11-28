@@ -1,10 +1,11 @@
 
-import { SavedImage, Watermark } from "../types";
+import { SavedImage, Watermark, PromptTemplate } from "../types";
 
 const DB_NAME = 'NexusAI_GalleryDB';
 const IMAGES_STORE = 'images';
 const WATERMARKS_STORE = 'watermarks';
-const DB_VERSION = 2; // Upgraded version
+const TEMPLATES_STORE = 'templates'; // NEW STORE
+const DB_VERSION = 3; // Upgraded version for Templates
 
 /**
  * Opens the IndexedDB database with disaster recovery.
@@ -23,27 +24,31 @@ const openDB = (): Promise<IDBDatabase> => {
         store.createIndex('tags', 'tags', { unique: false, multiEntry: true });
       }
 
-      // Create Watermarks Store if not exists (New in v2)
+      // Create Watermarks Store if not exists
       if (!db.objectStoreNames.contains(WATERMARKS_STORE)) {
         db.createObjectStore(WATERMARKS_STORE, { keyPath: 'id' });
+      }
+
+      // Create Templates Store if not exists (NEW)
+      if (!db.objectStoreNames.contains(TEMPLATES_STORE)) {
+        db.createObjectStore(TEMPLATES_STORE, { keyPath: 'id' });
       }
     };
 
     request.onsuccess = (event) => {
-      resolve((event.target as IDBOpenDBRequest).result);
+      const db = (event.target as IDBOpenDBRequest).result;
+      
+      db.onversionchange = () => {
+        db.close();
+        console.warn("Database version changed. Closing connection.");
+      };
+
+      resolve(db);
     };
 
     request.onerror = (event) => {
       console.error("DB Open Error:", (event.target as IDBOpenDBRequest).error);
-      // Attempt recovery by deleting corrupted DB
-      try {
-        console.warn("Attempting to delete corrupted database...");
-        indexedDB.deleteDatabase(DB_NAME);
-        // We reject here, caller should retry or handle gracefully
-        reject(new Error("Database was corrupted and reset. Please reload."));
-      } catch (e) {
-        reject((event.target as IDBOpenDBRequest).error);
-      }
+      reject((event.target as IDBOpenDBRequest).error);
     };
   });
 };
@@ -75,7 +80,7 @@ export const saveImageToGallery = async (
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([IMAGES_STORE], 'readwrite');
     const store = transaction.objectStore(IMAGES_STORE);
-    const request = store.put(image); // put is safer than add
+    const request = store.put(image);
 
     request.onsuccess = () => resolve(image);
     request.onerror = () => reject(request.error);
@@ -174,7 +179,7 @@ export const restoreGallery = async (images: SavedImage[]): Promise<void> => {
 };
 
 // ==========================================
-// WATERMARK OPERATIONS (New in V2)
+// WATERMARK OPERATIONS
 // ==========================================
 
 export const saveWatermark = async (watermark: Watermark): Promise<void> => {
@@ -239,5 +244,68 @@ export const restoreWatermarks = async (items: Watermark[]): Promise<void> => {
     items.forEach(item => {
       store.put(item);
     });
+  });
+};
+
+// ==========================================
+// PROMPT TEMPLATE OPERATIONS (NEW)
+// ==========================================
+
+export const saveTemplate = async (template: PromptTemplate): Promise<void> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([TEMPLATES_STORE], 'readwrite');
+    const store = transaction.objectStore(TEMPLATES_STORE);
+    const request = store.put(template);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const getAllTemplates = async (): Promise<PromptTemplate[]> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([TEMPLATES_STORE], 'readonly');
+    const store = transaction.objectStore(TEMPLATES_STORE);
+    const request = store.getAll();
+
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const deleteTemplateFromDB = async (id: string): Promise<void> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([TEMPLATES_STORE], 'readwrite');
+    const store = transaction.objectStore(TEMPLATES_STORE);
+    const request = store.delete(id);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const clearAllTemplates = async (): Promise<void> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([TEMPLATES_STORE], 'readwrite');
+    const store = transaction.objectStore(TEMPLATES_STORE);
+    store.clear();
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+};
+
+export const restoreTemplates = async (items: PromptTemplate[]): Promise<void> => {
+  if (!items || items.length === 0) return;
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([TEMPLATES_STORE], 'readwrite');
+    const store = transaction.objectStore(TEMPLATES_STORE);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    items.forEach(item => store.put(item));
   });
 };
