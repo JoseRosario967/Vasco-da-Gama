@@ -20,7 +20,16 @@ import {
   BookTemplate,
   Stamp,
   History,
-  Globe2
+  Globe2,
+  Zap,
+  Key,
+  Scroll,
+  Ghost,
+  Film,
+  Eraser,
+  Activity,
+  DraftingCompass,
+  Box 
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -54,21 +63,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const menuItems: MenuItem[] = [
     { type: 'action', id: AppView.DASHBOARD, label: 'Início', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { type: 'divider', label: 'Imagens' },
+    
+    // Top Priority Tools (Fixed)
+    { type: 'divider', label: 'Destaques' },
     { type: 'action', id: AppView.GENERATOR, label: 'Gerador de Imagens', icon: <Wand2 className="w-5 h-5" /> },
     { type: 'action', id: AppView.EDITOR, label: 'Editor Mágico', icon: <PenTool className="w-5 h-5" /> },
+
+    // Alphabetical List (Standardized to "Estúdio de...")
+    { type: 'divider', label: 'Estúdios A-Z' },
+    { type: 'action', id: AppView.THREED, label: 'Estúdio de 3D', icon: <Box className="w-5 h-5" /> },
+    { type: 'action', id: AppView.ANATOMY, label: 'Estúdio de Anatomia', icon: <Activity className="w-5 h-5" /> },
+    { type: 'action', id: AppView.MOTION, label: 'Estúdio de Animação', icon: <Film className="w-5 h-5" /> },
+    { type: 'action', id: AppView.CHEF, label: 'Estúdio de Culinária', icon: <ChefHat className="w-5 h-5" /> },
+    { type: 'action', id: AppView.DISCOVERY, label: 'Estúdio de Descoberta', icon: <ScanSearch className="w-5 h-5" /> },
+    { type: 'action', id: AppView.ELECTRICIAN, label: 'Estúdio de Eletricidade', icon: <Zap className="w-5 h-5" /> },
+    { type: 'action', id: AppView.GARDEN, label: 'Estúdio de Jardinagem', icon: <Sprout className="w-5 h-5" /> },
+    { type: 'action', id: AppView.LOTTERY, label: 'Estúdio de Lotaria', icon: <Clover className="w-5 h-5" /> },
+    { type: 'action', id: AppView.BATCH_WATERMARK, label: 'Estúdio de Marca d\'Água', icon: <Layers className="w-5 h-5" /> },
+    { type: 'action', id: AppView.WEATHER, label: 'Estúdio de Meteorologia', icon: <CloudSun className="w-5 h-5" /> },
     { type: 'action', id: AppView.MONTAGE, label: 'Estúdio de Montagem', icon: <Scissors className="w-5 h-5" /> },
-    { type: 'action', id: AppView.RESTORATION, label: 'Restauro de Fotos', icon: <History className="w-5 h-5" /> },
-    { type: 'action', id: AppView.TEXT_EDITOR, label: 'Editor de Texto', icon: <Type className="w-5 h-5" /> },
-    { type: 'action', id: AppView.DISCOVERY, label: 'Descobridor Prompt', icon: <ScanSearch className="w-5 h-5" /> },
-    { type: 'action', id: AppView.BATCH_WATERMARK, label: 'Marca d\'Água em Lote', icon: <Layers className="w-5 h-5" /> },
-    { type: 'divider', label: 'Utilidades' },
-    { type: 'action', id: AppView.LOTTERY, label: 'Sorte & Magia', icon: <Clover className="w-5 h-5" /> },
-    { type: 'action', id: AppView.TRANSLATOR, label: 'Tradutor Universal', icon: <Globe2 className="w-5 h-5" /> },
-    { type: 'action', id: AppView.CHEF, label: 'Chef Michelin', icon: <ChefHat className="w-5 h-5" /> },
-    { type: 'action', id: AppView.GARDEN, label: 'Jardinagem', icon: <Sprout className="w-5 h-5" /> },
-    { type: 'action', id: AppView.WEATHER, label: 'Meteorologia', icon: <CloudSun className="w-5 h-5" /> },
-    { type: 'action', id: AppView.POETRY, label: 'Poesia & Música', icon: <Music className="w-5 h-5" /> },
+    { type: 'action', id: AppView.PALEOGRAPHY, label: 'Estúdio de Paleografia', icon: <Scroll className="w-5 h-5" /> },
+    { type: 'action', id: AppView.POETRY, label: 'Estúdio de Poesia', icon: <Music className="w-5 h-5" /> },
+    { type: 'action', id: AppView.REMOVAL, label: 'Estúdio de Remoção', icon: <Eraser className="w-5 h-5" /> },
+    { type: 'action', id: AppView.RESTORATION, label: 'Estúdio de Restauro', icon: <History className="w-5 h-5" /> },
+    { type: 'action', id: AppView.TEXT_EDITOR, label: 'Estúdio de Texto', icon: <Type className="w-5 h-5" /> },
+    { type: 'action', id: AppView.TRANSLATOR, label: 'Estúdio de Tradução', icon: <Globe2 className="w-5 h-5" /> },
+    { type: 'action', id: AppView.TRANSPARENCY, label: 'Estúdio de Transparência', icon: <Ghost className="w-5 h-5" /> },
+    { type: 'action', id: AppView.VECTORIZER, label: 'Estúdio de Vetores', icon: <DraftingCompass className="w-5 h-5" /> },
   ];
 
   return (
@@ -205,6 +226,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
              >
                 <Database className="w-4 h-4" />
                 Backup & Dados
+             </button>
+
+             {/* API Key Configuration */}
+             <button 
+                onClick={() => (window as any).aistudio?.openSelectKey?.()}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm transition-colors border border-slate-700 group"
+                title="Configurar a sua própria chave Google Gemini"
+             >
+                <Key className="w-4 h-4 text-amber-400 group-hover:text-amber-300" />
+                Chave API
              </button>
 
             <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50">

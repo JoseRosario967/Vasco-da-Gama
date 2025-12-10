@@ -28,7 +28,15 @@ export enum AppView {
   GARDEN = 'GARDEN',
   WEATHER = 'WEATHER',
   POETRY = 'POETRY',
-  TRANSLATOR = 'TRANSLATOR'
+  TRANSLATOR = 'TRANSLATOR',
+  PALEOGRAPHY = 'PALEOGRAPHY',
+  TRANSPARENCY = 'TRANSPARENCY',
+  MOTION = 'MOTION',
+  REMOVAL = 'REMOVAL',
+  ELECTRICIAN = 'ELECTRICIAN',
+  ANATOMY = 'ANATOMY',
+  VECTORIZER = 'VECTORIZER',
+  THREED = 'THREED'
 }
 
 export interface UploadedFile {
@@ -110,24 +118,22 @@ export interface GardenTips {
   moonPhase: string; 
 }
 
-// New: Personalized Garden Plan
 export interface GardenPlan {
   title: string;
-  summary: string; // Brief overview
-  methodAdvice: string; // Specific advice for Sowing vs Planting
-  soilTips: string; // Based on region/family
-  tasks: string[]; // Actionable steps
-  expertAnswer?: string; // Answer to specific doubt if provided
+  summary: string;
+  methodAdvice: string;
+  soilTips: string;
+  tasks: string[];
+  expertAnswer?: string;
   moonPhase: string;
 }
 
-// Garden Encyclopedia Type
 export interface CropReport {
   name: string;
   scientificName: string;
   imageKeywords: string; 
   family: string;
-  origin: string; // NEW FIELD: Origin/History
+  origin: string;
   plantingSeason: string; 
   harvestTime: string; 
   soil: {
@@ -141,6 +147,30 @@ export interface CropReport {
   treatments: string; 
   pruning: string; 
   associations: string; 
+}
+
+// New: Bio Recipe for Garden
+export interface BioRecipe {
+    treatmentGuide: {
+        name: string;
+        description: string;
+        ingredients: string[];
+        equipment: string[];
+        preparation: string[];
+        application: string;
+        precautions: string;
+    }
+}
+
+// Bio Treatment Guide Interface (Alias for BioRecipe inner object for consistency)
+export interface BioTreatmentGuide {
+    name: string;
+    description: string;
+    ingredients: string[];
+    equipment: string[];
+    preparation: string[];
+    application: string;
+    precautions: string;
 }
 
 // Weather Types
@@ -158,4 +188,52 @@ export interface PoemResult {
   title: string;
   content: string;
   style: string;
+}
+
+// Paleography Types (NEW)
+export interface PaleographyResult {
+    scriptType: string; // e.g., "Latim Medieval", "Cursiva Inglesa"
+    estimatedDate: string; // e.g., "Séc. XV"
+    transcription: string; // The text in original language
+    translation: string; // Portuguese translation
+    context: string; // Historical context
+}
+
+// Electrician Types
+export interface ElectricalGuide {
+  title: string;
+  safetyWarnings: string[];
+  diagramUrl?: string;
+  materials: string[];
+  steps: string[];
+  technicalNotes: string;
+  imagePrompt?: string;
+}
+
+// Anatomy Types (NEW)
+export interface AnatomyGuide {
+  title: string;
+  system: string;
+  function: string;
+  location: string;
+  structure: string[];
+  clinicalNotes: string;
+  funFact: string;
+  imageUrl?: string;
+  imagePrompt?: string;
+}
+
+export interface SymptomAnalysisResult {
+    condition: string;
+    severity: 'Leve' | 'Moderado' | 'Preocupante' | 'Consultar Médico';
+    description: string;
+    possibleCauses: string[];
+    recommendations: string[];
+    warning: string;
+}
+
+// Video Types
+export interface GeneratedVideoResult {
+    videoUrl: string;
+    prompt: string;
 }

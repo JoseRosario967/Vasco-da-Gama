@@ -27,8 +27,10 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
   onConsumeSharedPrompt
 }) => {
   const [prompt, setPrompt] = useState('');
+  
+  // CHANGED: Default quality to 'high' to use Imagen models by default
   const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>({
-      quality: 'standard',
+      quality: 'high',
       aspectRatio: '1:1',
       negativePrompt: ''
   });

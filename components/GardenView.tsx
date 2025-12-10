@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from './Button';
 import { generateGardenPlan, generateCropDetails } from '../services/geminiService';
@@ -19,20 +18,18 @@ export const GardenView: React.FC<GardenViewProps> = ({
   onToggleWatermark
 }) => {
   const [mode, setMode] = useState<DashboardMode>('new');
-  
-  // Local Toggle
   const [localWatermarkEnabled, setLocalWatermarkEnabled] = useState(true);
 
-  // --- DASHBOARD STATE (New/Maintenance) ---
+  // --- DASHBOARD STATE ---
   const [month, setMonth] = useState('Novembro');
   const [region, setRegion] = useState('Centro');
   const [method, setMethod] = useState<'Semear (Sementes)' | 'Plantar (Mudas)'>('Semear (Sementes)');
   const [family, setFamily] = useState('Hortaliças');
-  const [specificPlant, setSpecificPlant] = useState(''); // New State
+  const [specificPlant, setSpecificPlant] = useState('');
   const [doubts, setDoubts] = useState('');
   const [gardenPlan, setGardenPlan] = useState<GardenPlan | null>(null);
   
-  // --- ENCYCLOPEDIA STATE (Search) ---
+  // --- ENCYCLOPEDIA STATE ---
   const [searchQuery, setSearchQuery] = useState('');
   const [cropReport, setCropReport] = useState<CropReport | null>(null);
 
@@ -46,11 +43,10 @@ export const GardenView: React.FC<GardenViewProps> = ({
     setIsLoading(true);
     setGardenPlan(null);
     try {
-        // Pass specificPlant to service
         const data = await generateGardenPlan(month, region, method, family, doubts, specificPlant);
         setGardenPlan(data);
     } catch (e) {
-        alert("Erro ao consultar a horta. Tente novamente.");
+        alert("Erro ao consultar a horta.");
     } finally {
         setIsLoading(false);
     }
@@ -64,7 +60,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
           const data = await generateCropDetails(searchQuery);
           setCropReport(data);
       } catch (e) {
-          alert("Erro ao gerar ficha técnica.");
+          alert("Erro ao gerar ficha.");
       } finally {
           setIsLoading(false);
       }
@@ -98,7 +94,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
                 </div>
             </div>
 
-            <!-- ORIGIN SECTION (NEW) -->
+            <!-- ORIGIN SECTION -->
             ${cropReport.origin ? `
             <div class="origin-box">
                 <strong>🌍 Origem & História:</strong> ${cropReport.origin}
@@ -186,7 +182,7 @@ export const GardenView: React.FC<GardenViewProps> = ({
             <title>Relatório Nexus AI</title>
             <style>
                 @page { size: A4; margin: 1.5cm; }
-                body { font-family: 'Helvetica', sans-serif; color: #1f2937; line-height: 1.5; margin: 0; padding: 0; }
+                body { font-family: 'Helvetica', sans-serif; color: #1f2937; line-height: 1.5; margin: 0; padding: 0; padding-bottom: 60px; }
                 
                 /* Layouts */
                 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px; }
@@ -203,12 +199,13 @@ export const GardenView: React.FC<GardenViewProps> = ({
                 .plan-header { border-bottom: 2px solid #166534; margin-bottom: 20px; padding-bottom: 10px; }
                 .plan-header h1 { color: #166534; margin: 0; font-size: 28px; }
                 
-                .card { border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; background: #f9fafb; page-break-inside: avoid; }
+                /* Cards Styling - Avoid Break Inside */
+                .card { border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; background: #f9fafb; page-break-inside: avoid; break-inside: avoid; }
                 
-                .section { margin-bottom: 20px; page-break-inside: avoid; }
-                h3 { color: #15803d; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 0; }
+                .section { margin-bottom: 20px; page-break-inside: avoid; break-inside: avoid; }
+                h3 { color: #15803d; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 0; page-break-after: avoid; }
                 
-                .summary-box { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; font-style: italic; color: #166534; margin-bottom: 20px; }
+                .summary-box { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; font-style: italic; color: #166534; margin-bottom: 20px; page-break-inside: avoid; }
                 .expert-box { background: #eef2ff; border: 1px solid #c7d2fe; padding: 15px; border-radius: 8px; color: #3730a3; page-break-inside: avoid; }
                 
                 ul { padding-left: 20px; }

@@ -16,7 +16,15 @@ import {
   Clover,
   Scissors,
   History,
-  Globe2
+  Globe2,
+  Scroll,
+  Ghost,
+  Film,
+  Eraser,
+  Zap,
+  Activity,
+  DraftingCompass,
+  Box 
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -25,6 +33,7 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const tools = [
+    // --- TOP PRIORITY (FIXED) ---
     {
       id: AppView.GENERATOR,
       title: 'Gerador de Imagens',
@@ -41,68 +50,54 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       color: 'from-pink-500 to-rose-500',
       active: true
     },
+
+    // --- ALPHABETICAL ORDER (Standardized "Estúdio de...") ---
     {
-      id: AppView.MONTAGE,
-      title: 'Estúdio de Montagem',
-      description: 'Combine duas imagens (Fundo + Sujeito) numa composição realista.',
-      icon: <Scissors className="w-6 h-6" />,
-      color: 'from-orange-500 to-red-500',
+      id: AppView.THREED,
+      title: 'Estúdio de 3D',
+      description: 'Transforme imagens 2D em renders 3D (Clay, Low Poly, Voxel).',
+      icon: <Box className="w-6 h-6" />,
+      color: 'from-cyan-500 to-blue-500',
       active: true
     },
     {
-      id: AppView.RESTORATION,
-      title: 'Restauro de Fotos',
-      description: 'Recupere fotos antigas ou danificadas, removendo ruído e melhorando a nitidez.',
-      icon: <History className="w-6 h-6" />,
-      color: 'from-amber-600 to-orange-700',
+      id: AppView.ANATOMY,
+      title: 'Estúdio de Anatomia',
+      description: 'Explore o corpo humano em 3D e obtenha relatórios médicos.',
+      icon: <Activity className="w-6 h-6" />,
+      color: 'from-blue-600 to-cyan-600',
       active: true
     },
     {
-      id: AppView.TEXT_EDITOR,
-      title: 'Editor de Texto',
-      description: 'Adicione textos, legendas e marcas de água às suas imagens em tempo real.',
-      icon: <Type className="w-6 h-6" />,
-      color: 'from-emerald-500 to-teal-500',
+      id: AppView.MOTION, 
+      title: 'Estúdio de Animação',
+      description: 'Dê vida a fotos estáticas com zoom, movimento e efeitos de vídeo.',
+      icon: <Film className="w-6 h-6" />,
+      color: 'from-pink-600 to-purple-600',
+      active: true
+    },
+    {
+      id: AppView.CHEF,
+      title: 'Estúdio de Culinária',
+      description: 'Receitas personalizadas com base no que tem no frigorífico.',
+      icon: <ChefHat className="w-6 h-6" />,
+      color: 'from-orange-500 to-amber-500',
       active: true
     },
     {
       id: AppView.DISCOVERY,
-      title: 'Descobridor Prompt',
-      description: 'Engenharia reversa: descubra qual o prompt usado para alterar uma imagem.',
+      title: 'Estúdio de Descoberta',
+      description: 'Engenharia reversa: descubra o prompt de qualquer imagem.',
       icon: <ScanSearch className="w-6 h-6" />,
       color: 'from-cyan-500 to-blue-500',
       active: true
     },
     {
-        id: AppView.BATCH_WATERMARK,
-        title: 'Marca d\'Água em Lote',
-        description: 'Aplique o seu logótipo a centenas de imagens de uma só vez.',
-        icon: <Layers className="w-6 h-6" />,
-        color: 'from-slate-500 to-gray-500',
-        active: true
-      },
-    {
-        id: AppView.LOTTERY,
-        title: 'Sorte & Magia',
-        description: 'Gerador de chaves Euromilhões baseado em estatísticas quentes/frias.',
-        icon: <Clover className="w-6 h-6" />,
-        color: 'from-amber-400 to-yellow-600',
-        active: true
-    },
-    {
-        id: AppView.TRANSLATOR,
-        title: 'Tradutor Universal',
-        description: 'Tradução inteligente com deteção automática e contexto cultural.',
-        icon: <Globe2 className="w-6 h-6" />,
-        color: 'from-cyan-600 to-sky-600',
-        active: true
-    },
-    {
-      id: AppView.CHEF,
-      title: 'Chef Michelin',
-      description: 'Receitas personalizadas com base no que tem no frigorífico.',
-      icon: <ChefHat className="w-6 h-6" />,
-      color: 'from-orange-500 to-amber-500',
+      id: AppView.ELECTRICIAN,
+      title: 'Estúdio de Eletricidade',
+      description: 'Guias técnicos, esquemas de ligação e normas de segurança.',
+      icon: <Zap className="w-6 h-6" />,
+      color: 'from-amber-500 to-yellow-500',
       active: true
     },
     {
@@ -114,21 +109,101 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       active: true
     },
     {
+      id: AppView.LOTTERY,
+      title: 'Estúdio de Lotaria',
+      description: 'Gerador de chaves Euromilhões baseado em estatísticas.',
+      icon: <Clover className="w-6 h-6" />,
+      color: 'from-amber-400 to-yellow-600',
+      active: true
+    },
+    {
+      id: AppView.BATCH_WATERMARK,
+      title: 'Estúdio de Marca d\'Água',
+      description: 'Aplique o seu logótipo a centenas de imagens de uma só vez.',
+      icon: <Layers className="w-6 h-6" />,
+      color: 'from-slate-500 to-gray-500',
+      active: true
+    },
+    {
       id: AppView.WEATHER,
-      title: 'Meteorologia',
+      title: 'Estúdio de Meteorologia',
       description: 'Previsões detalhadas com linguagem popular portuguesa.',
       icon: <CloudSun className="w-6 h-6" />,
       color: 'from-sky-500 to-blue-500',
       active: true
     },
     {
-        id: AppView.POETRY,
-        title: 'Poesia & Música',
-        description: 'Crie poemas e letras de músicas originais.',
-        icon: <Music className="w-6 h-6" />,
-        color: 'from-purple-500 to-fuchsia-500',
-        active: true
-    }
+      id: AppView.MONTAGE,
+      title: 'Estúdio de Montagem',
+      description: 'Combine duas imagens (Fundo + Sujeito) numa composição realista.',
+      icon: <Scissors className="w-6 h-6" />,
+      color: 'from-orange-500 to-red-500',
+      active: true
+    },
+    {
+      id: AppView.PALEOGRAPHY, 
+      title: 'Estúdio de Paleografia',
+      description: 'Decifre, transcreva e traduza manuscritos antigos.',
+      icon: <Scroll className="w-6 h-6" />,
+      color: 'from-amber-700 to-yellow-800',
+      active: true
+    },
+    {
+      id: AppView.POETRY,
+      title: 'Estúdio de Poesia',
+      description: 'Crie poemas e letras de músicas originais com áudio.',
+      icon: <Music className="w-6 h-6" />,
+      color: 'from-purple-500 to-fuchsia-500',
+      active: true
+    },
+    {
+      id: AppView.REMOVAL,
+      title: 'Estúdio de Remoção',
+      description: 'Apague objetos ou pessoas indesejadas da sua foto com um pincel.',
+      icon: <Eraser className="w-6 h-6" />,
+      color: 'from-red-500 to-orange-500',
+      active: true
+    },
+    {
+      id: AppView.RESTORATION,
+      title: 'Estúdio de Restauro',
+      description: 'Recupere fotos antigas, removendo ruído e melhorando a nitidez.',
+      icon: <History className="w-6 h-6" />,
+      color: 'from-amber-600 to-orange-700',
+      active: true
+    },
+    {
+      id: AppView.TEXT_EDITOR,
+      title: 'Estúdio de Texto',
+      description: 'Adicione textos, legendas e marcas de água às suas imagens.',
+      icon: <Type className="w-6 h-6" />,
+      color: 'from-emerald-500 to-teal-500',
+      active: true
+    },
+    {
+      id: AppView.TRANSLATOR,
+      title: 'Estúdio de Tradução',
+      description: 'Tradução inteligente com deteção automática e contexto.',
+      icon: <Globe2 className="w-6 h-6" />,
+      color: 'from-cyan-600 to-sky-600',
+      active: true
+    },
+    {
+      id: AppView.TRANSPARENCY, 
+      title: 'Estúdio de Transparência',
+      description: 'Ajuste a opacidade das suas imagens e exporte com fundo transparente.',
+      icon: <Ghost className="w-6 h-6" />,
+      color: 'from-slate-400 to-slate-600',
+      active: true
+    },
+    {
+      id: AppView.VECTORIZER,
+      title: 'Estúdio de Vetores',
+      description: 'Converta imagens ou texto em código SVG (Logótipos e Ícones).',
+      icon: <DraftingCompass className="w-6 h-6" />,
+      color: 'from-orange-500 to-amber-500',
+      active: true
+    },
   ];
 
   return (

@@ -477,7 +477,7 @@ export const TextEditorView: React.FC<TextEditorViewProps> = ({
               <input 
                 type="checkbox" 
                 checked={showBackground}
-                onChange={(e) => setShowBackground(e.target.value)}
+                onChange={(e) => setShowBackground(e.target.checked)}
                 className="w-5 h-5 rounded border-slate-600 text-indigo-600 focus:ring-indigo-500 bg-slate-800"
               />
             </div>

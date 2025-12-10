@@ -14,13 +14,21 @@ import { WeatherView } from './components/WeatherView';
 import { PoetryView } from './components/PoetryView';
 import { RestorationView } from './components/RestorationView';
 import { TranslatorView } from './components/TranslatorView';
+import { PaleographyView } from './components/PaleographyView';
+import { TransparencyView } from './components/TransparencyView'; 
+import { MotionStudio } from './components/MotionStudio';
+import { RemovalView } from './components/RemovalView';
+import { ElectricianView } from './components/ElectricianView';
+import { AnatomyView } from './components/AnatomyView'; 
+import { VectorView } from './components/VectorView';
+import { ThreeDView } from './components/ThreeDView'; // NEW IMPORT
 import { WatermarkManager } from './components/WatermarkManager';
 import { GalleryModal } from './components/GalleryModal';
 import { BackupManager } from './components/BackupManager'; 
-import { PromptTemplatesPanel } from './components/PromptTemplatesPanel'; // Import Template Panel
+import { PromptTemplatesPanel } from './components/PromptTemplatesPanel'; 
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
-import { getAllWatermarks, saveWatermark, deleteWatermark } from './services/galleryService'; 
+import { getAllWatermarks, saveWatermark, deleteWatermark, restoreTemplates } from './services/galleryService'; 
 import { Menu, AlertTriangle } from 'lucide-react';
 
 interface ErrorBoundaryProps {
@@ -79,7 +87,6 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       );
     }
 
-    // Cast 'this' to 'any' to access 'props' which TS might not see on 'ErrorBoundary' type
     return (this as any).props.children;
   }
 }
@@ -111,6 +118,7 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     const initData = async () => {
         try {
+            // 1. Watermark Migration
             try {
                 const legacyCheck = localStorage.getItem('nexus_watermarks');
                 if (legacyCheck && legacyCheck.length > 4000000) { 
@@ -121,18 +129,18 @@ const AppContent: React.FC = () => {
                 localStorage.removeItem('nexus_watermarks');
             }
 
-            const legacyCheck = localStorage.getItem('nexus_watermarks');
-            
+            const legacyWatermarks = localStorage.getItem('nexus_watermarks');
             let wms: Watermark[] = [];
+            
             try {
                 wms = await getAllWatermarks();
             } catch (dbError) {
                 console.error("Failed to load watermarks from DB:", dbError);
             }
 
-            if (legacyCheck) {
+            if (legacyWatermarks) {
                 try {
-                    const parsed = JSON.parse(legacyCheck);
+                    const parsed = JSON.parse(legacyWatermarks);
                     if (Array.isArray(parsed) && parsed.length > 0) {
                         console.log("Migrating watermarks from LocalStorage to IndexedDB...");
                         for (const wm of parsed) {
@@ -152,6 +160,20 @@ const AppContent: React.FC = () => {
             if (savedSettings) {
                 setWatermarkSettings(JSON.parse(savedSettings));
             }
+
+            // 2. Template Migration (CRITICAL FIX)
+            const legacyTemplates = localStorage.getItem('nexus_prompt_templates');
+            if (legacyTemplates) {
+                try {
+                    const parsed = JSON.parse(legacyTemplates);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        console.log("Migrating Prompt Templates to IndexedDB...");
+                        await restoreTemplates(parsed);
+                    }
+                } catch (e) { console.error("Template Migration failed", e); }
+                localStorage.removeItem('nexus_prompt_templates'); // Clear legacy to prevent reload
+            }
+
         } catch (e) {
             console.error("Failed to initialize app data", e);
         }
@@ -261,6 +283,14 @@ const AppContent: React.FC = () => {
                 onConsumeSharedPrompt={() => setSharedPrompt(null)}
             />
         );
+      case AppView.REMOVAL:
+        return (
+            <RemovalView 
+                watermarkSettings={watermarkSettings}
+                activeWatermark={getActiveWatermark()}
+                onToggleWatermark={(enabled) => updateWatermarkSettings({...watermarkSettings, isEnabled: enabled})}
+            />
+        );
       case AppView.MONTAGE:
         return (
             <MontageView 
@@ -279,6 +309,10 @@ const AppContent: React.FC = () => {
                 onToggleWatermark={(enabled) => updateWatermarkSettings({...watermarkSettings, isEnabled: enabled})}
             />
         );
+      case AppView.TRANSPARENCY:
+        return <TransparencyView />;
+      case AppView.MOTION: 
+        return <MotionStudio />;
       case AppView.BATCH_WATERMARK:
         return (
             <BatchWatermarkView 
@@ -297,6 +331,40 @@ const AppContent: React.FC = () => {
         );
       case AppView.TRANSLATOR:
         return <TranslatorView />;
+      case AppView.PALEOGRAPHY: 
+        return (
+            <PaleographyView
+                watermarkSettings={watermarkSettings}
+                activeWatermark={getActiveWatermark()}
+                onToggleWatermark={(enabled) => updateWatermarkSettings({...watermarkSettings, isEnabled: enabled})}
+            />
+        );
+      case AppView.ELECTRICIAN:
+        return (
+            <ElectricianView 
+                watermarkSettings={watermarkSettings}
+                activeWatermark={getActiveWatermark()}
+                onToggleWatermark={(enabled) => updateWatermarkSettings({...watermarkSettings, isEnabled: enabled})}
+            />
+        );
+      case AppView.ANATOMY:
+        return (
+            <AnatomyView 
+                watermarkSettings={watermarkSettings}
+                activeWatermark={getActiveWatermark()}
+                onToggleWatermark={(enabled) => updateWatermarkSettings({...watermarkSettings, isEnabled: enabled})}
+            />
+        );
+      case AppView.VECTORIZER:
+        return <VectorView />;
+      case AppView.THREED: 
+        return (
+            <ThreeDView 
+                watermarkSettings={watermarkSettings}
+                activeWatermark={getActiveWatermark()}
+                onToggleWatermark={(enabled) => updateWatermarkSettings({...watermarkSettings, isEnabled: enabled})}
+            />
+        );
       case AppView.LOTTERY:
         return <LotteryView />;
       case AppView.CHEF:
@@ -323,12 +391,20 @@ const AppContent: React.FC = () => {
     switch (currentView) {
       case AppView.GENERATOR: return 'Gerador de Imagens';
       case AppView.EDITOR: return 'Editor Mágico';
+      case AppView.REMOVAL: return 'Estúdio de Remoção';
       case AppView.MONTAGE: return 'Estúdio de Montagem';
       case AppView.DISCOVERY: return 'Descobridor de Incentivos';
       case AppView.TEXT_EDITOR: return 'Editor de Texto';
+      case AppView.TRANSPARENCY: return 'Estúdio de Transparência';
+      case AppView.MOTION: return 'Estúdio de Animação'; 
       case AppView.BATCH_WATERMARK: return 'Marca d\'Água em Lote';
       case AppView.RESTORATION: return 'Restauro de Fotos';
       case AppView.TRANSLATOR: return 'Tradutor Universal';
+      case AppView.PALEOGRAPHY: return 'Paleógrafo AI';
+      case AppView.ELECTRICIAN: return 'Eletricista AI';
+      case AppView.ANATOMY: return 'BioDigital Anatomia';
+      case AppView.VECTORIZER: return 'Estúdio Vetorial';
+      case AppView.THREED: return 'Estúdio 3D';
       case AppView.LOTTERY: return 'Sorte & Magia';
       case AppView.CHEF: return 'Chef Michelin';
       case AppView.GARDEN: return 'Estúdio de Jardinagem';
@@ -402,7 +478,7 @@ const AppContent: React.FC = () => {
           <div className="max-w-7xl mx-auto text-center md:text-left text-slate-500 text-sm flex flex-col md:flex-row justify-between items-center gap-4">
             <p>Nexus AI © 2024 - Desenvolvido com Google Gemini</p>
             <div className="flex gap-4">
-              <span className="text-xs text-emerald-500/70 font-bold">v9.0 (Imagen 3 Engine)</span>
+              <span className="text-xs text-orange-500/70 font-bold">v20.0 (3D Suite)</span>
               <span className="hover:text-slate-300 cursor-pointer">Termos</span>
               <span className="hover:text-slate-300 cursor-pointer">Privacidade</span>
             </div>
