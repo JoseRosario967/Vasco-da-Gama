@@ -6,7 +6,24 @@ export type ImageQuality = 'standard' | 'high';
 export interface GeneratedImageResult {
   imageUrl: string | null;
   textOutput: string | null;
-  modelUsed?: string; // New field to track which model generated the image
+  modelUsed?: string;
+}
+
+export interface CustomStyle {
+  id: string;
+  name: string;
+  prompt: string;
+  previewUrl: string;
+  timestamp: number;
+}
+
+export interface AudioAnalysisResult {
+    lyrics: string;
+    instruments: string[];
+    structure: string;
+    meaning: string;
+    videoPrompt: string;
+    mood: string;
 }
 
 export interface AppError {
@@ -18,6 +35,7 @@ export enum AppView {
   DASHBOARD = 'DASHBOARD',
   GENERATOR = 'GENERATOR',
   EDITOR = 'EDITOR',
+  STYLE_STUDIO = 'STYLE_STUDIO',
   DISCOVERY = 'DISCOVERY',
   TEXT_EDITOR = 'TEXT_EDITOR',
   BATCH_WATERMARK = 'BATCH_WATERMARK',
@@ -28,6 +46,7 @@ export enum AppView {
   GARDEN = 'GARDEN',
   WEATHER = 'WEATHER',
   POETRY = 'POETRY',
+  QUOTES = 'QUOTES',
   TRANSLATOR = 'TRANSLATOR',
   PALEOGRAPHY = 'PALEOGRAPHY',
   TRANSPARENCY = 'TRANSPARENCY',
@@ -36,7 +55,14 @@ export enum AppView {
   ELECTRICIAN = 'ELECTRICIAN',
   ANATOMY = 'ANATOMY',
   VECTORIZER = 'VECTORIZER',
-  THREED = 'THREED'
+  THREED = 'THREED',
+  CARICATURE = 'CARICATURE',
+  REMEDIES = 'REMEDIES',
+  AUDIO_STUDIO = 'AUDIO_STUDIO',
+  AI_DETECTOR = 'AI_DETECTOR',
+  WATERMARK_STUDIO = 'WATERMARK_STUDIO',
+  GENDER_DETECTOR = 'GENDER_DETECTOR',
+  VISION_QUOTES = 'VISION_QUOTES'
 }
 
 export interface UploadedFile {
@@ -49,6 +75,36 @@ export interface UploadedFile {
 export interface EditorInitialState {
   image: UploadedFile;
   prompt: string;
+}
+
+export interface TextEditorInitialState {
+  image: UploadedFile;
+  text: string;
+}
+
+export interface AIDetectionResult {
+    probabilityAI: number; // 0 to 100
+    verdict: 'Real' | 'Gerada por IA' | 'Altamente Suspeita' | 'Inconclusiva';
+    analysis: string;
+    artifactsFound: string[];
+    technicalDetails: {
+        lighting: string;
+        textures: string;
+        anatomy: string;
+    };
+}
+
+export interface BiometricDetection {
+    label: string; // "MALE", "FEMALE", "UNKNOWN"
+    confidence: number;
+    box_2d: [number, number, number, number]; // [ymin, xmin, ymax, xmax] normalized 0-1000
+    analysis: string;
+}
+
+export interface BiometricResult {
+    detections: BiometricDetection[];
+    sceneContext: string;
+    timestamp_iso: string;
 }
 
 // Watermark Types
@@ -146,23 +202,37 @@ export interface CropReport {
   diseases: string[]; 
   treatments: string; 
   pruning: string; 
-  associations: string; 
+  companionPlants: string[]; // Updated
+  avoidPlants: string[]; // Updated
 }
 
-// New: Bio Recipe for Garden
-export interface BioRecipe {
-    treatmentGuide: {
-        name: string;
-        description: string;
-        ingredients: string[];
-        equipment: string[];
-        preparation: string[];
-        application: string;
-        precautions: string;
-    }
+// New: Plant Identification Result
+export interface PlantIdentification {
+    commonName: string;
+    scientificName: string;
+    family: string;
+    originHistory: string;
+    portugalContext: string;
+    maintenanceTips: string;
+    dangerLevel: 'Segura' | 'Tóxica' | 'Cuidado com Espinhos' | 'Alérgica';
+    rarity: string;
 }
 
-// Bio Treatment Guide Interface (Alias for BioRecipe inner object for consistency)
+// New: Pruning Guide
+export interface PruningGuide {
+    plantName: string;
+    scientificName: string;
+    bestTime: string;
+    toolsNeeded: string[];
+    objectives: string;
+    stepByStep: string[];
+    whatToCut: string;
+    howToCut: string;
+    imagePrompt: string;
+    imageUrl?: string;
+}
+
+// New: Bio Treatment Guide
 export interface BioTreatmentGuide {
     name: string;
     description: string;
@@ -190,7 +260,14 @@ export interface PoemResult {
   style: string;
 }
 
-// Paleography Types (NEW)
+// Quotes Types (NEW)
+export interface QuoteResult {
+  text: string;
+  author: string; // Could be "Nexus AI" or a simulated persona
+  tone: string;
+}
+
+// Paleography Types
 export interface PaleographyResult {
     scriptType: string; // e.g., "Latim Medieval", "Cursiva Inglesa"
     estimatedDate: string; // e.g., "Séc. XV"
@@ -210,7 +287,7 @@ export interface ElectricalGuide {
   imagePrompt?: string;
 }
 
-// Anatomy Types (NEW)
+// Anatomy Types
 export interface AnatomyGuide {
   title: string;
   system: string;
@@ -230,6 +307,21 @@ export interface SymptomAnalysisResult {
     possibleCauses: string[];
     recommendations: string[];
     warning: string;
+}
+
+// Remedies Types
+export interface RemedyGuide {
+    title: string;
+    type: 'Chá' | 'Infusão' | 'Xarope' | 'Cataplasma' | 'Unguento' | 'Outro';
+    description: string;
+    scientificName?: string;
+    ingredients: string[];
+    preparation: string[];
+    dosage: string;
+    benefits: string[];
+    contraindications: string[];
+    imagePrompt: string;
+    imageUrl?: string;
 }
 
 // Video Types
